@@ -124,13 +124,22 @@ class ApiClient {
         return await this.request<DeveloperProfileResponse>(
           `/api/developers/${encodeURIComponent(username)}${refresh ? '?refresh=true' : ''}`
         );
-      } catch {
+      } catch (err: any) {
+        // If the backend actively responded with a specific domain error, propagate it
+        if (
+          err.code === 'USER_NOT_FOUND' ||
+          err.code === 'RATE_LIMITED' ||
+          err.code === 'GITHUB_UNAVAILABLE' ||
+          err.code === 'UNAUTHENTICATED' ||
+          err.code === 'VALIDATION_ERROR'
+        ) {
+          throw err;
+        }
+
+        // Only use mock fallback if network / connection failed
         if (MOCK_DEVELOPERS[username]) {
           return MOCK_DEVELOPERS[username];
         }
-        // Unknown user fallback
-        const err: any = new Error(`GitHub user "${username}" was not found`);
-        err.code = 'USER_NOT_FOUND';
         throw err;
       }
     },
@@ -151,7 +160,16 @@ class ApiClient {
         return await this.request<ComparisonResponse>(
           `/api/compare?users=${usernames.map(encodeURIComponent).join(',')}`
         );
-      } catch {
+      } catch (err: any) {
+        if (
+          err.code === 'VALIDATION_ERROR' ||
+          err.code === 'RATE_LIMITED' ||
+          err.code === 'GITHUB_UNAVAILABLE' ||
+          err.code === 'UNAUTHENTICATED'
+        ) {
+          throw err;
+        }
+
         // Demo comparison calculation
         const cleanUsers = usernames.map((u) => u.trim().toLowerCase());
         const profiles = cleanUsers
