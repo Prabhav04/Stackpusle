@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, ShieldCheck, ArrowRight, Eye, EyeOff, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Activity, ShieldCheck, ArrowRight, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.js';
 
 export const AuthPage: React.FC = () => {
@@ -49,27 +49,6 @@ export const AuthPage: React.FC = () => {
       navigate('/dashboard');
     } catch (err: any) {
       setServerError(err.message || 'Authentication failed. Please check your details.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleQuickDemo = async () => {
-    setEmail('demo@stackpulse.dev');
-    setPassword('stackpulse123');
-    setServerError(null);
-    setFieldErrors({});
-    setLoading(true);
-    try {
-      // Try login first, or register if account doesn't exist yet
-      try {
-        await login('demo@stackpulse.dev', 'stackpulse123');
-      } catch {
-        await register('demo@stackpulse.dev', 'stackpulse123');
-      }
-      navigate('/dashboard');
-    } catch (err: any) {
-      setServerError(err.message || 'Demo login failed');
     } finally {
       setLoading(false);
     }
@@ -241,19 +220,6 @@ export const AuthPage: React.FC = () => {
                 </>
               )}
             </button>
-
-            {/* Quick Demo Fill Button */}
-            <div className="pt-2 text-center">
-              <button
-                type="button"
-                onClick={handleQuickDemo}
-                disabled={loading}
-                className="text-xs text-[#94a3b8] hover:text-[#fb7185] transition-colors inline-flex items-center gap-1.5 cursor-pointer py-1"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-[#e11d48]" />
-                <span>Instant 1-Click Demo Sign In</span>
-              </button>
-            </div>
           </form>
 
           {/* Security & Architecture Note */}
