@@ -1,34 +1,81 @@
 @import "tailwindcss";
 
+@theme {
+  --color-pulse-bg: #0f0606;
+  --color-pulse-surface: #170909;
+  --color-pulse-card: #200b0b;
+  --color-pulse-border: #2f0000;
+  --color-pulse-border-light: #490000;
+  --color-pulse-crimson: #650000;
+  --color-pulse-vibrant: #e11d48;
+  --color-pulse-glow: #ff2d55;
+  --color-pulse-accent: #fb7185;
+
+  --color-pulse-text-main: #f8fafc;
+  --color-pulse-text-muted: #94a3b8;
+  --color-pulse-text-dim: #64748b;
+
+  --color-dev-primary: #f43f5e;
+  --color-dev-secondary: #f59e0b;
+  --color-dev-tertiary: #06b6d4;
+
+  --color-score-reach: #f43f5e;
+  --color-score-impact: #f59e0b;
+  --color-score-activity: #10b981;
+  --color-score-breadth: #38bdf8;
+}
+
 :root {
   color-scheme: dark;
 }
 
 body {
   margin: 0;
-  background-color: #0a0d14;
-  color: #f3f4f6;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--color-pulse-bg);
+  color: var(--color-pulse-text-main);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', Helvetica, Arial, sans-serif;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom scrollbar for sleek modern aesthetic */
+/* Subtle Crimson Ambient Lighting */
+.bg-ambient-glow {
+  background: radial-gradient(circle at 50% 0%, rgba(101, 0, 0, 0.25) 0%, rgba(15, 6, 6, 0) 70%);
+}
+
+.bg-ambient-glow-bottom {
+  background: radial-gradient(circle at 50% 100%, rgba(101, 0, 0, 0.2) 0%, rgba(15, 6, 6, 0) 60%);
+}
+
+/* Card Glow Effect */
+.card-crimson {
+  background: #170909;
+  border: 1px solid #2f0000;
+  box-shadow: 0 4px 20px -2px rgba(15, 6, 6, 0.7), 0 0 15px -3px rgba(101, 0, 0, 0.15);
+  transition: all 0.2s ease-in-out;
+}
+
+.card-crimson:hover {
+  border-color: #490000;
+  box-shadow: 0 8px 30px -4px rgba(15, 6, 6, 0.8), 0 0 25px -2px rgba(225, 29, 72, 0.12);
+}
+
+/* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: #0f0606;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: #2f0000;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: #490000;
 }
