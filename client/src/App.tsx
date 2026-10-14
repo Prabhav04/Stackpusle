@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext.js';
+import { AmbientBackground } from './components/AmbientBackground.js';
 import { AuthPage } from './pages/AuthPage.js';
 import { DashboardPage } from './pages/DashboardPage.js';
 import { ProfilePage } from './pages/ProfilePage.js';
@@ -12,7 +13,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#0f0606] flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-[#2f0000] border-t-[#e11d48] rounded-full animate-spin" />
       </div>
     );
@@ -31,7 +32,7 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#0f0606] flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-[#2f0000] border-t-[#e11d48] rounded-full animate-spin" />
       </div>
     );
@@ -47,43 +48,51 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 export function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route
-            path="/auth"
-            element={
-              <PublicRoute>
-                <AuthPage />
-              </PublicRoute>
-            }
-          />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <DashboardPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/profile/:username"
-            element={
-              <ProtectedRoute>
-                <ProfilePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/compare"
-            element={
-              <ProtectedRoute>
-                <ComparePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
-      </BrowserRouter>
+      <div className="relative min-h-screen bg-[#0f0606] text-white selection:bg-[#e11d48] selection:text-white overflow-x-hidden">
+        {/* Cinematic Crimson Light Rays & Telemetry Grid */}
+        <AmbientBackground />
+
+        {/* Foreground Content */}
+        <div className="relative z-10">
+          <BrowserRouter>
+            <Routes>
+              <Route
+                path="/auth"
+                element={
+                  <PublicRoute>
+                    <AuthPage />
+                  </PublicRoute>
+                }
+              />
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <DashboardPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/profile/:username"
+                element={
+                  <ProtectedRoute>
+                    <ProfilePage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/compare"
+                element={
+                  <ProtectedRoute>
+                    <ComparePage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </BrowserRouter>
+        </div>
+      </div>
     </AuthProvider>
   );
 }

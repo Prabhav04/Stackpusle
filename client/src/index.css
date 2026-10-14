@@ -39,13 +39,111 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Subtle Crimson Ambient Lighting */
-.bg-ambient-glow {
-  background: radial-gradient(circle at 50% 0%, rgba(101, 0, 0, 0.25) 0%, rgba(15, 6, 6, 0) 70%);
+/* ======================================================== */
+/* ⚡ VOLUMETRIC CRIMSON LIGHT RAYS & AMBIENT ANIMATIONS   */
+/* ======================================================== */
+
+@keyframes raySweepTopLeft {
+  0% {
+    transform: rotate(-38deg) translateY(-5%) scale(1);
+    opacity: 0.55;
+  }
+  50% {
+    transform: rotate(-33deg) translateY(4%) scale(1.1);
+    opacity: 0.85;
+  }
+  100% {
+    transform: rotate(-41deg) translateY(-2%) scale(1.02);
+    opacity: 0.6;
+  }
 }
 
-.bg-ambient-glow-bottom {
-  background: radial-gradient(circle at 50% 100%, rgba(101, 0, 0, 0.2) 0%, rgba(15, 6, 6, 0) 60%);
+@keyframes rayDriftTopRight {
+  0% {
+    transform: rotate(44deg) translateX(-6%) scale(0.95);
+    opacity: 0.4;
+  }
+  50% {
+    transform: rotate(49deg) translateX(4%) scale(1.15);
+    opacity: 0.7;
+  }
+  100% {
+    transform: rotate(41deg) translateX(-3%) scale(1);
+    opacity: 0.45;
+  }
+}
+
+@keyframes streakSweep {
+  0% {
+    background-position: 200% 0%;
+  }
+  50% {
+    background-position: 0% 100%;
+  }
+  100% {
+    background-position: -200% 200%;
+  }
+}
+
+/* Primary sweeping angled ray from top-left corner to bottom-right */
+.ray-beam-1 {
+  background: conic-gradient(
+    from 195deg at 10% 0%,
+    transparent 0deg,
+    rgba(225, 29, 72, 0.18) 18deg,
+    rgba(255, 45, 85, 0.45) 26deg,
+    rgba(251, 113, 133, 0.55) 30deg,
+    rgba(101, 0, 0, 0.6) 38deg,
+    transparent 55deg,
+    rgba(225, 29, 72, 0.25) 70deg,
+    transparent 90deg
+  );
+  filter: blur(45px);
+  animation: raySweepTopLeft 14s ease-in-out infinite alternate;
+  mix-blend-mode: screen;
+}
+
+/* Secondary cross-cutting ray from opposite corner */
+.ray-beam-2 {
+  background: conic-gradient(
+    from 315deg at 90% 5%,
+    transparent 0deg,
+    rgba(225, 29, 72, 0.2) 20deg,
+    rgba(255, 45, 85, 0.4) 32deg,
+    rgba(101, 0, 0, 0.5) 45deg,
+    transparent 65deg
+  );
+  filter: blur(55px);
+  animation: rayDriftTopRight 18s ease-in-out infinite alternate;
+  mix-blend-mode: screen;
+}
+
+/* High-velocity diagonal scanner streak across the viewport */
+.pulse-light-streak {
+  background: linear-gradient(
+    125deg,
+    transparent 0%,
+    transparent 40%,
+    rgba(225, 29, 72, 0.15) 47%,
+    rgba(255, 45, 85, 0.45) 50%,
+    rgba(255, 150, 175, 0.6) 51%,
+    rgba(225, 29, 72, 0.2) 53%,
+    transparent 60%,
+    transparent 100%
+  );
+  background-size: 300% 300%;
+  filter: blur(28px);
+  animation: streakSweep 10s ease-in-out infinite;
+  mix-blend-mode: screen;
+}
+
+/* Subtle digital pulse grid */
+.cyber-grid {
+  background-image: 
+    linear-gradient(to right, rgba(225, 29, 72, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(225, 29, 72, 0.05) 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: radial-gradient(circle at 50% 30%, black 40%, transparent 85%);
 }
 
 /* Card Glow Effect */

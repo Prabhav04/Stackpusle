@@ -76,7 +76,7 @@ export const AuthPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-4 sm:p-6 md:p-8 bg-[#0f0606] relative overflow-hidden">
+    <div className="min-h-screen w-full flex items-center justify-center p-4 sm:p-6 md:p-8 bg-transparent relative overflow-hidden">
       {/* Ambient background glow accents */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#650000]/20 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#e11d48]/10 rounded-full blur-3xl pointer-events-none" />
