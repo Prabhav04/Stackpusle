@@ -5,7 +5,8 @@ export interface User {
 }
 
 export interface SignalScoreDetail {
-  score: number;
+  score: number | null;
+  isAvailable?: boolean;
   raw: number | string;
   formula: string;
   description: string;

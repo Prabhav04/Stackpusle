@@ -6,7 +6,7 @@ import { ValidationError, UnauthenticatedError } from '../utils/errors.js';
 
 const registerSchema = z.object({
   email: z.string().email('Please enter a valid email address').toLowerCase().trim(),
-  password: z.string().min(6, 'Password must be at least 6 characters long'),
+  password: z.string().min(8, 'Password must be at least 8 characters long'),
 });
 
 const loginSchema = z.object({

@@ -153,7 +153,7 @@ export const ComparePage: React.FC = () => {
     }
   };
 
-  // Format Radar Data
+  // Format Radar Data (preserving null without coercing to 0)
   const radarChartData = React.useMemo(() => {
     if (!data?.developers || data.developers.length < 2) return [];
 
@@ -168,7 +168,8 @@ export const ComparePage: React.FC = () => {
       const item: Record<string, any> = { signal: sig.label };
       data.developers.forEach((d) => {
         const scoreKey = sig.key as keyof typeof d.signals;
-        item[d.developer.username] = (d.signals as any)[scoreKey]?.score || 0;
+        const val = (d.signals as any)[scoreKey]?.score;
+        item[d.developer.username] = val !== null && val !== undefined ? val : null;
       });
       return item;
     });
@@ -292,23 +293,68 @@ export const ComparePage: React.FC = () => {
           ))}
         </div>
 
-        {/* Loading State */}
+        {/* Loading Skeleton */}
         {loading && (
-          <div className="p-16 text-center rounded-3xl bg-[#170909] border border-[#2f0000]">
-            <div className="w-10 h-10 border-3 border-[#2f0000] border-t-[#e11d48] rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-sm text-white font-medium">Fetching developer profiles & computing signal scores...</p>
-            <p className="text-xs text-[#94a3b8] mt-1">Inspecting owned repositories and calculating log-scaled metrics</p>
+          <div className="space-y-8 animate-pulse">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-64 rounded-3xl bg-[#170909] border border-[#2f0000] p-6 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-[#200b0b]" />
+                    <div className="space-y-2 flex-1">
+                      <div className="h-4 w-28 bg-[#200b0b] rounded" />
+                      <div className="h-3 w-16 bg-[#200b0b] rounded" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 pt-2">
+                    <div className="h-12 bg-[#200b0b] rounded-xl" />
+                    <div className="h-12 bg-[#200b0b] rounded-xl" />
+                  </div>
+                  <div className="space-y-2 pt-2">
+                    <div className="h-2.5 bg-[#200b0b] rounded-full" />
+                    <div className="h-2.5 bg-[#200b0b] rounded-full" />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="h-80 rounded-3xl bg-[#170909] border border-[#2f0000]" />
           </div>
         )}
 
         {/* Error State */}
         {!loading && error && (
-          <div className="p-6 rounded-2xl bg-[#1a0808] border border-[#490000] text-center max-w-lg mx-auto">
-            <AlertTriangle className="w-8 h-8 text-[#e11d48] mx-auto mb-2" />
-            <p className="text-sm text-white font-semibold mb-1">{error}</p>
+          <div className="p-8 rounded-3xl bg-[#1a0808] border border-[#490000] text-center max-w-lg mx-auto">
+            <AlertTriangle className="w-10 h-10 text-[#e11d48] mx-auto mb-3" />
+            <h3 className="text-base font-bold text-white mb-1">Comparison Error</h3>
+            <p className="text-sm text-[#cbd5e1] mb-2">{error}</p>
             <p className="text-xs text-[#94a3b8]">
-              Verify that the usernames are spelled correctly and exist on GitHub.
+              Verify that GitHub usernames are valid, spelled correctly, and exist.
             </p>
+          </div>
+        )}
+
+        {/* Empty State when fewer than 2 developers */}
+        {!loading && !error && (!data || data.developers.length < 2) && (
+          <div className="p-12 text-center rounded-3xl bg-[#170909] border border-[#2f0000] max-w-xl mx-auto my-8">
+            <GitCompare className="w-12 h-12 text-[#e11d48] mx-auto mb-3 opacity-60" />
+            <h3 className="text-lg font-bold text-white mb-1">Add Developers to Compare</h3>
+            <p className="text-xs text-[#94a3b8] mb-6">
+              Enter at least 2 GitHub usernames above or pick a preset to see deterministic Signal Scores and language distributions side by side.
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {PRESET_COMPARISONS.map((p) => (
+                <button
+                  key={p.label}
+                  onClick={() => {
+                    setUsernames(p.users);
+                    runComparison(p.users);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-[#200b0b] hover:bg-[#350d0d] border border-[#2f0000] text-xs font-semibold text-[#fb7185] transition-colors cursor-pointer"
+                >
+                  Load {p.label}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -378,12 +424,18 @@ export const ComparePage: React.FC = () => {
                             <span className="text-[#94a3b8] flex items-center gap-1">
                               Reach {isReachLeader && <Trophy className="w-3 h-3 text-[#f43f5e]" />}
                             </span>
-                            <span className="font-mono font-bold text-white">{d.signals.reach.score}</span>
+                            <span className="font-mono font-bold text-white">
+                              {d.signals.reach.score !== null ? (
+                                d.signals.reach.score
+                              ) : (
+                                <span className="text-xs text-[#94a3b8] font-normal italic">N/A</span>
+                              )}
+                            </span>
                           </div>
                           <div className="w-full h-1.5 rounded-full bg-[#0f0606] overflow-hidden">
                             <div
                               className="h-full rounded-full"
-                              style={{ width: `${d.signals.reach.score}%`, backgroundColor: color.stroke }}
+                              style={{ width: `${d.signals.reach.score ?? 0}%`, backgroundColor: color.stroke }}
                             />
                           </div>
                         </div>
@@ -394,12 +446,18 @@ export const ComparePage: React.FC = () => {
                             <span className="text-[#94a3b8] flex items-center gap-1">
                               Impact {isImpactLeader && <Trophy className="w-3 h-3 text-[#f59e0b]" />}
                             </span>
-                            <span className="font-mono font-bold text-white">{d.signals.impact.score}</span>
+                            <span className="font-mono font-bold text-white">
+                              {d.signals.impact.score !== null ? (
+                                d.signals.impact.score
+                              ) : (
+                                <span className="text-xs text-[#94a3b8] font-normal italic">N/A</span>
+                              )}
+                            </span>
                           </div>
                           <div className="w-full h-1.5 rounded-full bg-[#0f0606] overflow-hidden">
                             <div
                               className="h-full rounded-full"
-                              style={{ width: `${d.signals.impact.score}%`, backgroundColor: color.stroke }}
+                              style={{ width: `${d.signals.impact.score ?? 0}%`, backgroundColor: color.stroke }}
                             />
                           </div>
                         </div>
@@ -410,12 +468,18 @@ export const ComparePage: React.FC = () => {
                             <span className="text-[#94a3b8] flex items-center gap-1">
                               Activity {isActivityLeader && <Trophy className="w-3 h-3 text-[#10b981]" />}
                             </span>
-                            <span className="font-mono font-bold text-white">{d.signals.activity.score}%</span>
+                            <span className="font-mono font-bold text-white">
+                              {d.signals.activity.score !== null ? (
+                                `${d.signals.activity.score}%`
+                              ) : (
+                                <span className="text-xs text-[#94a3b8] font-normal italic">N/A</span>
+                              )}
+                            </span>
                           </div>
                           <div className="w-full h-1.5 rounded-full bg-[#0f0606] overflow-hidden">
                             <div
                               className="h-full rounded-full"
-                              style={{ width: `${d.signals.activity.score}%`, backgroundColor: color.stroke }}
+                              style={{ width: `${d.signals.activity.score ?? 0}%`, backgroundColor: color.stroke }}
                             />
                           </div>
                         </div>
@@ -426,12 +490,18 @@ export const ComparePage: React.FC = () => {
                             <span className="text-[#94a3b8] flex items-center gap-1">
                               Breadth {isBreadthLeader && <Trophy className="w-3 h-3 text-[#38bdf8]" />}
                             </span>
-                            <span className="font-mono font-bold text-white">{d.signals.breadth.score}</span>
+                            <span className="font-mono font-bold text-white">
+                              {d.signals.breadth.score !== null ? (
+                                d.signals.breadth.score
+                              ) : (
+                                <span className="text-xs text-[#94a3b8] font-normal italic">N/A</span>
+                              )}
+                            </span>
                           </div>
                           <div className="w-full h-1.5 rounded-full bg-[#0f0606] overflow-hidden">
                             <div
                               className="h-full rounded-full"
-                              style={{ width: `${d.signals.breadth.score}%`, backgroundColor: color.stroke }}
+                              style={{ width: `${d.signals.breadth.score ?? 0}%`, backgroundColor: color.stroke }}
                             />
                           </div>
                         </div>
@@ -451,6 +521,36 @@ export const ComparePage: React.FC = () => {
                   </div>
                 );
               })}
+            </div>
+
+            {/* Transparent Signal Score Formulas Banner */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-[#170909] border border-[#2f0000] flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-[#e11d48] block mb-0.5">
+                  Signature Feature · Explainable Signal Formulas
+                </span>
+                <span className="text-xs text-[#94a3b8]">
+                  Deterministic heuristics calculated from owned repos (forks excluded):
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full md:w-auto font-mono text-[11px]">
+                <div className="p-2 rounded-xl bg-[#0f0606] border border-[#2f0000]">
+                  <span className="text-[#fb7185] font-bold block">Reach</span>
+                  <span className="text-[#94a3b8]">min(100, 25×log10)</span>
+                </div>
+                <div className="p-2 rounded-xl bg-[#0f0606] border border-[#2f0000]">
+                  <span className="text-[#f59e0b] font-bold block">Impact</span>
+                  <span className="text-[#94a3b8]">min(100, 20×log10)</span>
+                </div>
+                <div className="p-2 rounded-xl bg-[#0f0606] border border-[#2f0000]">
+                  <span className="text-[#10b981] font-bold block">Activity</span>
+                  <span className="text-[#94a3b8]">% pushed in 90d</span>
+                </div>
+                <div className="p-2 rounded-xl bg-[#0f0606] border border-[#2f0000]">
+                  <span className="text-[#38bdf8] font-bold block">Breadth</span>
+                  <span className="text-[#94a3b8]">min(100, count×15)</span>
+                </div>
+              </div>
             </div>
 
             {/* Radar Chart Section */}
@@ -504,6 +604,10 @@ export const ComparePage: React.FC = () => {
                         color: '#fff',
                         fontSize: '12px',
                       }}
+                      formatter={(value: any) => [
+                        value === null || value === undefined ? 'Unavailable' : `${value}/100`,
+                        '',
+                      ]}
                     />
                   </RadarChart>
                 </ResponsiveContainer>

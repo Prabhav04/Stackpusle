@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import session from 'express-session';
 import { PrismaSessionStore } from '@quixo3/prisma-session-store';
 import { env } from './config/env.js';
@@ -14,10 +16,26 @@ import * as pinController from './controllers/pinController.js';
 export function createApp(): express.Application {
   const app = express();
 
-  // Middleware
+  // Helmet HTTP security headers
+  app.use(
+    helmet({
+      contentSecurityPolicy: false, // Allow frontend resources and Vite dev
+      crossOriginEmbedderPolicy: false,
+    })
+  );
+
+  // Exact CORS origins with credentials enabled
+  const allowedOrigins = [env.CLIENT_URL, 'http://localhost:5173', 'http://127.0.0.1:5173'].filter(Boolean);
   app.use(
     cors({
-      origin: [env.CLIENT_URL, 'http://localhost:5173', 'http://127.0.0.1:5173'],
+      origin: (origin, callback) => {
+        // Allow requests with no origin (e.g. mobile apps, curl, or server-to-server tests)
+        if (!origin || allowedOrigins.includes(origin)) {
+          callback(null, true);
+        } else {
+          callback(new Error(`Origin ${origin} not allowed by StackPulse CORS policy`));
+        }
+      },
       credentials: true,
     })
   );
@@ -28,11 +46,12 @@ export function createApp(): express.Application {
   // Session middleware backed by PostgreSQL through Prisma
   app.use(
     session({
+      name: 'stackpulse.sid',
       cookie: {
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         httpOnly: true,
         secure: env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        sameSite: env.NODE_ENV === 'production' ? 'strict' : 'lax',
       },
       secret: env.SESSION_SECRET,
       resave: false,
@@ -44,6 +63,20 @@ export function createApp(): express.Application {
     })
   );
 
+  // Rate limiter on login and register to prevent brute-force attacks
+  const authRateLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 30, // 30 requests per 15 minutes per IP
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      error: {
+        code: 'RATE_LIMITED',
+        message: 'Too many authentication attempts. Please try again in 15 minutes.',
+      },
+    },
+  });
+
   // Health check endpoint
   app.get('/api/health', (_req, res) => {
     res.json({
@@ -53,9 +86,9 @@ export function createApp(): express.Application {
     });
   });
 
-  // Auth Routes
-  app.post('/api/auth/register', authController.register);
-  app.post('/api/auth/login', authController.login);
+  // Auth Routes (with rate limiting on register and login)
+  app.post('/api/auth/register', authRateLimiter, authController.register);
+  app.post('/api/auth/login', authRateLimiter, authController.login);
   app.post('/api/auth/logout', requireAuth, authController.logout);
   app.get('/api/auth/me', authController.getCurrentUser);
 

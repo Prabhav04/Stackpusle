@@ -313,22 +313,28 @@ export const ProfilePage: React.FC = () => {
                 <div className="p-5 rounded-2xl bg-[#170909] border border-[#2f0000] relative group hover:border-[#490000] transition-all">
                   <div className="flex items-center justify-between text-xs text-[#94a3b8] mb-2">
                     <span className="font-semibold uppercase tracking-wider text-[#fb7185]">Reach</span>
-                    <span className="text-xs font-mono">{data.signals.reach.raw.toLocaleString()} followers</span>
+                    <span className="text-xs font-mono">{typeof data.signals.reach.raw === 'number' ? data.signals.reach.raw.toLocaleString() : data.signals.reach.raw} followers</span>
                   </div>
-                  <div className="flex items-baseline gap-2 mb-3">
-                    <span className="text-4xl font-black text-white">{data.signals.reach.score}</span>
-                    <span className="text-xs text-[#64748b]">/100</span>
-                  </div>
+                  {data.signals.reach.score !== null ? (
+                    <div className="flex items-baseline gap-2 mb-3">
+                      <span className="text-4xl font-black text-white">{data.signals.reach.score}</span>
+                      <span className="text-xs text-[#64748b]">/100</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-baseline gap-2 mb-3 py-1">
+                      <span className="text-xl font-bold text-[#94a3b8] italic">Unavailable</span>
+                    </div>
+                  )}
                   <div className="w-full h-2 rounded-full bg-[#0f0606] overflow-hidden mb-3">
                     <div
                       className="h-full rounded-full bg-gradient-to-r from-[#650000] to-[#e11d48]"
-                      style={{ width: `${data.signals.reach.score}%` }}
+                      style={{ width: `${data.signals.reach.score ?? 0}%` }}
                     />
                   </div>
                   <p className="text-[11px] text-[#94a3b8] leading-tight mb-2">
                     {data.signals.reach.description}
                   </p>
-                  <div className="pt-2 border-t border-[#2f0000] text-[10px] text-[#64748b] font-mono">
+                  <div className="pt-2 border-t border-[#2f0000] text-[10px] text-[#cbd5e1] font-mono">
                     Formula: {data.signals.reach.formula}
                   </div>
                 </div>
@@ -337,22 +343,31 @@ export const ProfilePage: React.FC = () => {
                 <div className="p-5 rounded-2xl bg-[#170909] border border-[#2f0000] relative group hover:border-[#490000] transition-all">
                   <div className="flex items-center justify-between text-xs text-[#94a3b8] mb-2">
                     <span className="font-semibold uppercase tracking-wider text-[#f59e0b]">Impact</span>
-                    <span className="text-xs font-mono">{data.signals.impact.raw.toLocaleString()} stars</span>
+                    <span className="text-xs font-mono">{typeof data.signals.impact.raw === 'number' ? data.signals.impact.raw.toLocaleString() : data.signals.impact.raw} stars</span>
                   </div>
-                  <div className="flex items-baseline gap-2 mb-3">
-                    <span className="text-4xl font-black text-white">{data.signals.impact.score}</span>
-                    <span className="text-xs text-[#64748b]">/100</span>
-                  </div>
+                  {data.signals.impact.score !== null ? (
+                    <div className="flex items-baseline gap-2 mb-3">
+                      <span className="text-4xl font-black text-white">{data.signals.impact.score}</span>
+                      <span className="text-xs text-[#64748b]">/100</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-baseline gap-2 mb-3 py-1">
+                      <span className="text-xl font-bold text-[#94a3b8] italic">Unavailable</span>
+                    </div>
+                  )}
                   <div className="w-full h-2 rounded-full bg-[#0f0606] overflow-hidden mb-3">
                     <div
                       className="h-full rounded-full bg-gradient-to-r from-[#92400e] to-[#f59e0b]"
-                      style={{ width: `${data.signals.impact.score}%` }}
+                      style={{ width: `${data.signals.impact.score ?? 0}%` }}
                     />
                   </div>
                   <p className="text-[11px] text-[#94a3b8] leading-tight mb-2">
                     {data.signals.impact.description}
                   </p>
-                  <div className="pt-2 border-t border-[#2f0000] text-[10px] text-[#64748b] font-mono truncate" title={data.signals.impact.qualityLabel}>
+                  <div className="pt-2 border-t border-[#2f0000] text-[10px] text-[#cbd5e1] font-mono">
+                    Formula: {data.signals.impact.formula}
+                  </div>
+                  <div className="pt-1 text-[10px] text-[#64748b] font-mono truncate" title={data.signals.impact.qualityLabel}>
                     {data.signals.impact.qualityLabel}
                   </div>
                 </div>
@@ -361,22 +376,31 @@ export const ProfilePage: React.FC = () => {
                 <div className="p-5 rounded-2xl bg-[#170909] border border-[#2f0000] relative group hover:border-[#490000] transition-all">
                   <div className="flex items-center justify-between text-xs text-[#94a3b8] mb-2">
                     <span className="font-semibold uppercase tracking-wider text-[#10b981]">Activity</span>
-                    <span className="text-xs font-mono">{data.signals.activity.raw} pushed</span>
+                    <span className="text-xs font-mono">{data.signals.activity.raw}</span>
                   </div>
-                  <div className="flex items-baseline gap-2 mb-3">
-                    <span className="text-4xl font-black text-white">{data.signals.activity.score}%</span>
-                    <span className="text-xs text-[#64748b]">/100</span>
-                  </div>
+                  {data.signals.activity.score !== null ? (
+                    <div className="flex items-baseline gap-2 mb-3">
+                      <span className="text-4xl font-black text-white">{data.signals.activity.score}%</span>
+                      <span className="text-xs text-[#64748b]">/100</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-baseline gap-2 mb-3 py-1">
+                      <span className="text-xl font-bold text-[#94a3b8] italic">Unavailable</span>
+                    </div>
+                  )}
                   <div className="w-full h-2 rounded-full bg-[#0f0606] overflow-hidden mb-3">
                     <div
                       className="h-full rounded-full bg-gradient-to-r from-[#065f46] to-[#10b981]"
-                      style={{ width: `${data.signals.activity.score}%` }}
+                      style={{ width: `${data.signals.activity.score ?? 0}%` }}
                     />
                   </div>
                   <p className="text-[11px] text-[#94a3b8] leading-tight mb-2">
                     {data.signals.activity.description}
                   </p>
-                  <div className="pt-2 border-t border-[#2f0000] text-[10px] text-[#64748b] font-mono">
+                  <div className="pt-2 border-t border-[#2f0000] text-[10px] text-[#cbd5e1] font-mono">
+                    Formula: {data.signals.activity.formula}
+                  </div>
+                  <div className="pt-1 text-[10px] text-[#64748b] font-mono truncate" title={data.signals.activity.qualityLabel}>
                     {data.signals.activity.qualityLabel}
                   </div>
                 </div>
@@ -387,21 +411,27 @@ export const ProfilePage: React.FC = () => {
                     <span className="font-semibold uppercase tracking-wider text-[#38bdf8]">Breadth</span>
                     <span className="text-xs font-mono">{data.signals.breadth.raw} languages</span>
                   </div>
-                  <div className="flex items-baseline gap-2 mb-3">
-                    <span className="text-4xl font-black text-white">{data.signals.breadth.score}</span>
-                    <span className="text-xs text-[#64748b]">/100</span>
-                  </div>
+                  {data.signals.breadth.score !== null ? (
+                    <div className="flex items-baseline gap-2 mb-3">
+                      <span className="text-4xl font-black text-white">{data.signals.breadth.score}</span>
+                      <span className="text-xs text-[#64748b]">/100</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-baseline gap-2 mb-3 py-1">
+                      <span className="text-xl font-bold text-[#94a3b8] italic">Unavailable</span>
+                    </div>
+                  )}
                   <div className="w-full h-2 rounded-full bg-[#0f0606] overflow-hidden mb-3">
                     <div
                       className="h-full rounded-full bg-gradient-to-r from-[#0369a1] to-[#38bdf8]"
-                      style={{ width: `${data.signals.breadth.score}%` }}
+                      style={{ width: `${data.signals.breadth.score ?? 0}%` }}
                     />
                   </div>
                   <p className="text-[11px] text-[#94a3b8] leading-tight mb-2">
                     {data.signals.breadth.description}
                   </p>
-                  <div className="pt-2 border-t border-[#2f0000] text-[10px] text-[#64748b] font-mono">
-                    Formula: min(100, distinct × 15)
+                  <div className="pt-2 border-t border-[#2f0000] text-[10px] text-[#cbd5e1] font-mono">
+                    Formula: {data.signals.breadth.formula}
                   </div>
                 </div>
 
@@ -448,7 +478,15 @@ export const ProfilePage: React.FC = () => {
                 <div>
                   <h3 className="text-base font-bold text-white">Repositories</h3>
                   <p className="text-xs text-[#94a3b8] mt-0.5">
-                    Showing {sortedRepos.length} repositories ({data.signals.summary.totalOwnedRepos} owned, {sortedRepos.filter(r => r.isFork).length} forks)
+                    {data.developer.publicRepos > sortedRepos.length ? (
+                      <span>
+                        Showing first <strong className="text-white">{sortedRepos.length}</strong> of <strong className="text-[#fb7185]">{data.developer.publicRepos}</strong> public repositories ({data.signals.summary.totalOwnedRepos} owned, {sortedRepos.filter(r => r.isFork).length} forks).
+                      </span>
+                    ) : (
+                      <span>
+                        Showing <strong className="text-white">{sortedRepos.length}</strong> repositories ({data.signals.summary.totalOwnedRepos} owned, {sortedRepos.filter(r => r.isFork).length} forks).
+                      </span>
+                    )}
                   </p>
                 </div>
 

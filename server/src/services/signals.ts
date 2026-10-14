@@ -14,7 +14,8 @@ export interface DeveloperSignalsInput {
 }
 
 export interface SignalScoreDetail {
-  score: number;
+  score: number | null;
+  isAvailable: boolean;
   raw: number | string;
   formula: string;
   description: string;
@@ -47,6 +48,7 @@ export function calculateReach(followers: number): SignalScoreDetail {
 
   return {
     score,
+    isAvailable: true,
     raw: safeFollowers,
     formula: 'min(100, 25 × log10(followers + 1))',
     description: 'Audience size indicator (10,000 followers = 100)',
@@ -63,6 +65,17 @@ export function calculateImpact(
   analyzedReposCount: number,
   totalPublicRepos: number
 ): SignalScoreDetail {
+  if (analyzedReposCount === 0) {
+    return {
+      score: null,
+      isAvailable: false,
+      raw: 'unavailable',
+      formula: 'min(100, 20 × log10(totalStars + 1))',
+      description: 'Recognition of owned repos (100,000 stars = 100)',
+      qualityLabel: 'No owned repositories found to evaluate impact (unavailable)',
+    };
+  }
+
   const safeStars = Math.max(0, totalStars || 0);
   const score = Math.min(100, Math.round(20 * Math.log10(safeStars + 1)));
 
@@ -73,6 +86,7 @@ export function calculateImpact(
 
   return {
     score,
+    isAvailable: true,
     raw: safeStars,
     formula: 'min(100, 20 × log10(totalStars + 1))',
     description: 'Recognition of owned repos (100,000 stars = 100)',
@@ -90,11 +104,12 @@ export function calculateActivity(
 ): SignalScoreDetail {
   if (totalOwnedRepos === 0) {
     return {
-      score: 0,
-      raw: '0/0',
+      score: null,
+      isAvailable: false,
+      raw: 'unavailable',
       formula: '% of owned repos pushed in last 90 days',
       description: 'Is the developer actively shipping code recently',
-      qualityLabel: 'No owned repositories found to assess recent push activity',
+      qualityLabel: 'No owned repositories found — activity metric is unavailable',
     };
   }
 
@@ -103,6 +118,7 @@ export function calculateActivity(
 
   return {
     score,
+    isAvailable: true,
     raw: `${activeReposCount}/${totalOwnedRepos}`,
     formula: '% of owned repos pushed in last 90 days',
     description: 'Is the developer actively shipping code recently',
@@ -115,12 +131,25 @@ export function calculateActivity(
  * Formula: min(100, distinctLanguages * 15)
  */
 export function calculateBreadth(
-  distinctLanguagesCount: number
+  distinctLanguagesCount: number,
+  totalOwnedRepos: number = 1
 ): SignalScoreDetail {
+  if (totalOwnedRepos === 0) {
+    return {
+      score: null,
+      isAvailable: false,
+      raw: 'unavailable',
+      formula: 'min(100, distinctLanguages × 15)',
+      description: 'Range of languages used across owned repos (7+ = 100)',
+      qualityLabel: 'No owned repositories found to assess language breadth (unavailable)',
+    };
+  }
+
   const score = Math.min(100, distinctLanguagesCount * 15);
 
   return {
     score,
+    isAvailable: true,
     raw: distinctLanguagesCount,
     formula: 'min(100, distinctLanguages × 15)',
     description: 'Range of languages used across owned repos (7+ = 100)',
@@ -169,7 +198,7 @@ export function calculateDeveloperSignals(
     reach: calculateReach(followers),
     impact: calculateImpact(totalStars, ownedRepos.length, publicRepos),
     activity: calculateActivity(activeReposCount, ownedRepos.length),
-    breadth: calculateBreadth(distinctLanguagesCount),
+    breadth: calculateBreadth(distinctLanguagesCount, ownedRepos.length),
     summary: {
       totalOwnedRepos: ownedRepos.length,
       totalStars,

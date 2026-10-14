@@ -9,7 +9,7 @@
     "start": "node dist/index.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:push": "prisma db push",
+    "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "test": "vitest run"
   },
@@ -20,7 +20,9 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "express-rate-limit": "^8.7.1",
     "express-session": "^1.18.1",
+    "helmet": "^8.3.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {

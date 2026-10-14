@@ -48,14 +48,16 @@ describe('Auth & Data Ownership Isolation Tests', () => {
       .post('/api/auth/register')
       .send({ email: user1Email, password })
       .expect(201);
-    user1Cookie = res1.headers['set-cookie'] || [];
+    const rawCookie1 = res1.headers['set-cookie'];
+    user1Cookie = Array.isArray(rawCookie1) ? rawCookie1 : rawCookie1 ? [rawCookie1] : [];
 
     // 3. Register User 2
     const res2 = await request(app)
       .post('/api/auth/register')
       .send({ email: user2Email, password })
       .expect(201);
-    user2Cookie = res2.headers['set-cookie'] || [];
+    const rawCookie2 = res2.headers['set-cookie'];
+    user2Cookie = Array.isArray(rawCookie2) ? rawCookie2 : rawCookie2 ? [rawCookie2] : [];
 
     // 4. User 1 creates a saved comparison
     const compRes = await request(app)

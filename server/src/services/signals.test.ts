@@ -66,10 +66,12 @@ describe('Signal Scores Calculations', () => {
   });
 
   describe('Activity: % of owned repos pushed in last 90 days', () => {
-    it('returns 0 when developer has 0 owned repos', () => {
+    it('returns score: null and unavailable when developer has 0 owned repos', () => {
       const res = calculateActivity(0, 0);
-      expect(res.score).toBe(0);
-      expect(res.raw).toBe('0/0');
+      expect(res.score).toBeNull();
+      expect(res.isAvailable).toBe(false);
+      expect(res.raw).toBe('unavailable');
+      expect(res.qualityLabel).toContain('unavailable');
     });
 
     it('returns 100% when all owned repos are recently active', () => {

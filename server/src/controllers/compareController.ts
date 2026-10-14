@@ -7,9 +7,12 @@ import { ValidationError, NotFoundError, UnauthenticatedError } from '../utils/e
 const saveComparisonSchema = z.object({
   name: z.string().min(1, 'Comparison name is required').max(60, 'Name must be 60 characters or less').trim(),
   usernames: z
-    .array(z.string().min(1))
+    .array(z.string().min(1).trim().toLowerCase())
     .min(2, 'Must compare at least 2 developers')
-    .max(3, 'Cannot compare more than 3 developers'),
+    .max(3, 'Cannot compare more than 3 developers')
+    .refine((arr) => new Set(arr).size === arr.length, {
+      message: 'Duplicate usernames are not allowed in a comparison',
+    }),
 });
 
 /**
@@ -23,14 +26,27 @@ export async function compareDevelopers(req: Request, res: Response, next: NextF
       throw new ValidationError('Query parameter "users" is required (e.g. ?users=torvalds,gaearon)');
     }
 
-    const usernames = Array.from(
-      new Set(
-        rawUsers
-          .split(',')
-          .map((u) => u.trim().toLowerCase())
-          .filter(Boolean)
-      )
-    );
+    const rawList = rawUsers
+      .split(',')
+      .map((u) => u.trim().toLowerCase())
+      .filter(Boolean);
+
+    // Validate GitHub username regex
+    const githubUserRegex = /^[a-z0-9](?:[a-z0-9]|-(?=[a-z0-9])){0,38}$/;
+    for (const uname of rawList) {
+      if (!githubUserRegex.test(uname)) {
+        throw new ValidationError(
+          `Invalid GitHub username: "${uname}". Usernames must be 1-39 alphanumeric characters or non-consecutive hyphens.`
+        );
+      }
+    }
+
+    const uniqueSet = new Set(rawList);
+    if (uniqueSet.size !== rawList.length) {
+      throw new ValidationError('Duplicate usernames detected. Head-to-head comparison requires distinct developers.');
+    }
+
+    const usernames = Array.from(uniqueSet);
 
     if (usernames.length < 2 || usernames.length > 3) {
       throw new ValidationError('Please provide between 2 and 3 unique usernames to compare');

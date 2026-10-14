@@ -150,6 +150,12 @@ function formatDeveloperResponse(
   };
 }
 
+const GITHUB_USERNAME_REGEX = /^[a-z0-9](?:[a-z0-9]|-(?=[a-z0-9])){0,38}$/;
+
+export function isValidGitHubUsername(username: string): boolean {
+  return GITHUB_USERNAME_REGEX.test(username);
+}
+
 /**
  * Get developer profile, repos and Signal Scores with 15-minute caching and stale fallback
  */
@@ -161,6 +167,12 @@ export async function getDeveloperProfile(
 
   if (!username) {
     throw new UserNotFoundError('Username is required');
+  }
+
+  if (!GITHUB_USERNAME_REGEX.test(username)) {
+    throw new UserNotFoundError(
+      `Invalid GitHub username format: "${username}". GitHub usernames can only contain alphanumeric characters or single hyphens and cannot begin or end with a hyphen.`
+    );
   }
 
   // 1. Check existing database record
