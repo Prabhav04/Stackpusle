@@ -59,11 +59,15 @@ export const ComparePage: React.FC = () => {
   const [saveName, setSaveName] = useState('');
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [savedComparisonName, setSavedComparisonName] = useState<string | null>(null);
 
   const runComparison = async (usersToCompare: string[]) => {
     if (usersToCompare.length < 2) {
       setError('Please add at least 2 developers to run head-to-head comparison.');
       setData(null);
+      setIsSaved(false);
+      setSavedComparisonName(null);
       return;
     }
     if (usersToCompare.length > 3) {
@@ -78,10 +82,14 @@ export const ComparePage: React.FC = () => {
     try {
       const res = await api.compare.get(usersToCompare);
       setData(res);
+      setIsSaved(Boolean(res.isSaved));
+      setSavedComparisonName(res.savedComparisonName || null);
       setSearchParams({ users: usersToCompare.join(',') });
     } catch (err: any) {
       setError(err.message || 'Failed to compare developers');
       setData(null);
+      setIsSaved(false);
+      setSavedComparisonName(null);
     } finally {
       setLoading(false);
     }
@@ -121,6 +129,8 @@ export const ComparePage: React.FC = () => {
       runComparison(next);
     } else {
       setData(null);
+      setIsSaved(false);
+      setSavedComparisonName(null);
       setSearchParams(next.length > 0 ? { users: next.join(',') } : {});
     }
   };
@@ -131,6 +141,8 @@ export const ComparePage: React.FC = () => {
     try {
       await api.compare.save(saveName.trim(), usernames);
       setSaveSuccess(true);
+      setIsSaved(true);
+      setSavedComparisonName(saveName.trim());
       setTimeout(() => {
         setIsSaving(false);
       }, 1500);
@@ -184,18 +196,34 @@ export const ComparePage: React.FC = () => {
 
           {/* Save Comparison Action */}
           {data?.developers && data.developers.length >= 2 && (
-            <button
-              onClick={() => {
-                setSaveName(
-                  `${data.developers.map((d) => d.developer.username).join(' vs ')}`
-                );
-                setIsSaving(true);
-              }}
-              className="px-4 py-2.5 rounded-xl bg-[#200b0b] hover:bg-[#350d0d] border border-[#2f0000] hover:border-[#490000] text-xs font-semibold text-[#fb7185] flex items-center gap-2 transition-all cursor-pointer shadow-md self-start md:self-center"
-            >
-              <Bookmark className="w-4 h-4 text-[#e11d48]" />
-              <span>Save Comparison</span>
-            </button>
+            isSaved ? (
+              <button
+                disabled
+                className="px-4 py-2.5 rounded-xl bg-[#14231b] border border-emerald-500/40 text-xs font-semibold text-emerald-400 flex items-center gap-2 cursor-default shadow-sm self-start md:self-center"
+                title={savedComparisonName ? `Saved as "${savedComparisonName}"` : 'Saved to dashboard'}
+              >
+                <Check className="w-4 h-4 text-emerald-400" />
+                <span>Saved</span>
+                {savedComparisonName && (
+                  <span className="text-[11px] text-emerald-400/80 font-normal max-w-[160px] truncate">
+                    ({savedComparisonName})
+                  </span>
+                )}
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  setSaveName(
+                    `${data.developers.map((d) => d.developer.username).join(' vs ')}`
+                  );
+                  setIsSaving(true);
+                }}
+                className="px-4 py-2.5 rounded-xl bg-[#200b0b] hover:bg-[#350d0d] border border-[#2f0000] hover:border-[#490000] text-xs font-semibold text-[#fb7185] flex items-center gap-2 transition-all cursor-pointer shadow-md self-start md:self-center"
+              >
+                <Bookmark className="w-4 h-4 text-[#e11d48]" />
+                <span>Save Comparison</span>
+              </button>
+            )
           )}
         </div>
 

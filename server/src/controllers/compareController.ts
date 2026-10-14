@@ -101,11 +101,45 @@ export async function compareDevelopers(req: Request, res: Response, next: NextF
       stars: successfulProfiles.reduce((max, p) => (p.signals.summary.totalStars > max.count ? { username: p.developer.username, count: p.signals.summary.totalStars } : max), { username: '', count: -1 }),
     };
 
+    // Check if the current user already saved this exact set of developers
+    let isSaved = false;
+    let savedComparisonId: string | null = null;
+    let savedComparisonName: string | null = null;
+
+    const userId = req.session?.userId;
+    if (userId) {
+      try {
+        const successfulIds = new Set(successfulProfiles.map((p) => p.developer.id));
+        const userComparisons = await prisma.comparison.findMany({
+          where: { userId },
+          include: { developers: true },
+        });
+
+        for (const comp of userComparisons) {
+          const compDevIds = new Set(comp.developers.map((d) => d.developerId));
+          if (
+            compDevIds.size === successfulIds.size &&
+            [...compDevIds].every((id) => successfulIds.has(id))
+          ) {
+            isSaved = true;
+            savedComparisonId = comp.id;
+            savedComparisonName = comp.name;
+            break;
+          }
+        }
+      } catch (checkErr) {
+        console.warn('Failed to check existing saved comparisons:', checkErr);
+      }
+    }
+
     res.json({
       developers: successfulProfiles,
       failedUsers,
       languageBreakdown,
       leaders,
+      isSaved,
+      savedComparisonId,
+      savedComparisonName,
     });
   } catch (err) {
     next(err);
@@ -158,7 +192,7 @@ export async function getSavedComparisons(req: Request, res: Response, next: Nex
 }
 
 /**
- * Save a new named comparison
+ * Save a new named comparison (prevents duplicate entries for the same developer combination)
  * POST /api/comparisons
  */
 export async function saveComparison(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -176,6 +210,69 @@ export async function saveComparison(req: Request, res: Response, next: NextFunc
     for (const uname of cleanUsernames) {
       const devProfile = await getDeveloperProfile(uname);
       developerIds.push(devProfile.developer.id);
+    }
+
+    // Check if a comparison with the exact same developer combination already exists for this user
+    const existingComparisons = await prisma.comparison.findMany({
+      where: { userId },
+      include: {
+        developers: {
+          include: {
+            developer: {
+              select: {
+                id: true,
+                username: true,
+                name: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const targetDevIds = new Set(developerIds);
+    const alreadySaved = existingComparisons.find((c) => {
+      const devIds = new Set(c.developers.map((d) => d.developerId));
+      return (
+        devIds.size === targetDevIds.size &&
+        [...devIds].every((id) => targetDevIds.has(id))
+      );
+    });
+
+    if (alreadySaved) {
+      // Update existing comparison name instead of creating duplicate
+      const updated = await prisma.comparison.update({
+        where: { id: alreadySaved.id },
+        data: { name },
+        include: {
+          developers: {
+            include: {
+              developer: {
+                select: {
+                  id: true,
+                  username: true,
+                  name: true,
+                  avatarUrl: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      res.status(200).json({
+        comparison: {
+          id: updated.id,
+          name: updated.name,
+          createdAt: updated.createdAt,
+          usernames: updated.developers.map((d: any) => d.developer.username),
+          developers: updated.developers.map((d: any) => d.developer),
+        },
+        message: 'Comparison updated successfully',
+        isExisting: true,
+      });
+      return;
     }
 
     const comparison = await prisma.comparison.create({
@@ -213,6 +310,7 @@ export async function saveComparison(req: Request, res: Response, next: NextFunc
         developers: comparison.developers.map((d: any) => d.developer),
       },
       message: 'Comparison saved successfully',
+      isExisting: false,
     });
   } catch (err) {
     next(err);

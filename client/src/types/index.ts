@@ -79,6 +79,9 @@ export interface ComparisonResponse {
     followers: { username: string; count: number };
     stars: { username: string; count: number };
   };
+  isSaved?: boolean;
+  savedComparisonId?: string | null;
+  savedComparisonName?: string | null;
 }
 
 export interface SavedComparison {
