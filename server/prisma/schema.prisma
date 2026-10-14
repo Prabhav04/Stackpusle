@@ -1,0 +1,120 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  passwordHash String
+  createdAt    DateTime      @default(now())
+
+  comparisons  Comparison[]
+  pins         Pin[]
+  recentViews  RecentView[]
+
+  @@map("users")
+}
+
+model Developer {
+  id          String   @id @default(uuid())
+  username    String   @unique
+  name        String?
+  avatarUrl   String?
+  bio         String?
+  followers   Int      @default(0)
+  publicRepos Int      @default(0)
+  fetchedAt   DateTime @default(now())
+
+  repos                Repo[]
+  comparisonDevelopers ComparisonDeveloper[]
+  recentViews          RecentView[]
+
+  @@map("developers")
+}
+
+model Repo {
+  id          String    @id @default(uuid())
+  developerId String
+  githubId    BigInt    @unique
+  name        String
+  url         String
+  description String?
+  stars       Int       @default(0)
+  language    String?
+  isFork      Boolean   @default(false)
+  pushedAt    DateTime?
+
+  developer Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+  pins      Pin[]
+
+  @@index([developerId])
+  @@map("repos")
+}
+
+model Comparison {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String
+  createdAt DateTime @default(now())
+
+  user       User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  developers ComparisonDeveloper[]
+
+  @@index([userId])
+  @@map("comparisons")
+}
+
+model ComparisonDeveloper {
+  id           String @id @default(uuid())
+  comparisonId String
+  developerId  String
+
+  comparison Comparison @relation(fields: [comparisonId], references: [id], onDelete: Cascade)
+  developer  Developer  @relation(fields: [developerId], references: [id], onDelete: Cascade)
+
+  @@unique([comparisonId, developerId])
+  @@map("comparison_developers")
+}
+
+model Pin {
+  id        String   @id @default(uuid())
+  userId    String
+  repoId    String
+  note      String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  repo Repo @relation(fields: [repoId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, repoId])
+  @@index([userId])
+  @@map("pins")
+}
+
+model RecentView {
+  id          String   @id @default(uuid())
+  userId      String
+  developerId String
+  viewedAt    DateTime @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  developer Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, developerId])
+  @@index([userId])
+  @@map("recent_views")
+}
+
+model Session {
+  id        String   @id
+  sid       String   @unique
+  data      String
+  expiresAt DateTime
+
+  @@map("sessions")
+}

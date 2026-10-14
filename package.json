@@ -1,0 +1,21 @@
+{
+  "name": "stackpulse",
+  "version": "1.0.0",
+  "private": true,
+  "description": "StackPulse — GitHub developer profiles and explainable head-to-head comparison",
+  "scripts": {
+    "dev": "concurrently -k -p \"[{name}]\" -n \"SERVER,CLIENT\" -c \"cyan,magenta\" \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev",
+    "build": "npm --prefix server run build && npm --prefix client run build",
+    "test": "npm --prefix server run test",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "prisma:generate": "npm --prefix server run prisma:generate",
+    "prisma:push": "npm --prefix server run prisma:push",
+    "prisma:studio": "npm --prefix server run prisma:studio"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
