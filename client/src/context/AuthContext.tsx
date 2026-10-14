@@ -35,11 +35,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const login = async (email: string, password: string) => {
+    sessionStorage.removeItem('stackpulse_explicit_logout');
     const res = await api.auth.login(email, password);
     setUser(res.user);
   };
 
   const register = async (email: string, password: string) => {
+    sessionStorage.removeItem('stackpulse_explicit_logout');
     const res = await api.auth.register(email, password);
     setUser(res.user);
   };

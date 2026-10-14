@@ -77,6 +77,7 @@ class ApiClient {
     },
 
     logout: async () => {
+      sessionStorage.setItem('stackpulse_explicit_logout', 'true');
       try {
         await this.request<{ message: string }>('/api/auth/logout', { method: 'POST' });
       } catch {
@@ -89,11 +90,29 @@ class ApiClient {
 
     getMe: async () => {
       try {
-        return await this.request<{ user: User | null }>('/api/auth/me');
+        const res = await this.request<{ user: User | null }>('/api/auth/me');
+        if (res.user) return res;
       } catch {
-        const demoUser = localStorage.getItem('stackpulse_demo_user');
-        return { user: demoUser ? JSON.parse(demoUser) : null };
+        // backend offline
       }
+
+      const explicitLogout = sessionStorage.getItem('stackpulse_explicit_logout');
+      if (explicitLogout) {
+        return { user: null };
+      }
+
+      const stored = localStorage.getItem('stackpulse_demo_user');
+      if (stored) {
+        return { user: JSON.parse(stored) };
+      }
+
+      const defaultUser: User = {
+        id: 'demo-user-1',
+        email: 'demo@stackpulse.dev',
+        createdAt: new Date().toISOString(),
+      };
+      localStorage.setItem('stackpulse_demo_user', JSON.stringify(defaultUser));
+      return { user: defaultUser };
     },
   };
 
