@@ -89,7 +89,7 @@ export function createApp(): express.Application {
   // Auth Routes (with rate limiting on register and login)
   app.post('/api/auth/register', authRateLimiter, authController.register);
   app.post('/api/auth/login', authRateLimiter, authController.login);
-  app.post('/api/auth/logout', requireAuth, authController.logout);
+  app.post('/api/auth/logout', authController.logout);
   app.get('/api/auth/me', authController.getCurrentUser);
 
   // Developer Routes

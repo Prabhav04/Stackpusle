@@ -87,12 +87,21 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
 }
 
 export function logout(req: Request, res: Response, next: NextFunction): void {
+  const finishLogout = () => {
+    res.clearCookie('stackpulse.sid');
+    res.clearCookie('connect.sid');
+    res.json({ message: 'Signed out successfully' });
+  };
+
+  if (!req.session) {
+    return finishLogout();
+  }
+
   req.session.destroy((err) => {
     if (err) {
       return next(err);
     }
-    res.clearCookie('connect.sid');
-    res.json({ message: 'Signed out successfully' });
+    finishLogout();
   });
 }
 
