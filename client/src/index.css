@@ -177,3 +177,13 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #490000;
 }
+
+/* Toast Progress Countdown */
+@keyframes toastCountdown {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}

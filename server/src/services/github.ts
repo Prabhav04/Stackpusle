@@ -233,17 +233,16 @@ export async function getDeveloperProfile(
         },
       });
 
-      // Clear previous repos to ensure synchronicity with the latest fetched page
-      await tx.repo.deleteMany({
-        where: { developerId: dev.id },
-      });
+      // Upsert repositories by stable githubId so existing pins and notes remain valid
+      const fetchedGithubIds = ghRepos.map((r) => BigInt(r.id));
 
-      // Batch create repos
-      if (ghRepos.length > 0) {
-        await tx.repo.createMany({
-          data: ghRepos.map((r) => ({
+      for (const r of ghRepos) {
+        const gId = BigInt(r.id);
+        await tx.repo.upsert({
+          where: { githubId: gId },
+          create: {
             developerId: dev.id,
-            githubId: BigInt(r.id),
+            githubId: gId,
             name: r.name,
             url: r.html_url,
             description: r.description,
@@ -251,7 +250,27 @@ export async function getDeveloperProfile(
             language: r.language,
             isFork: r.fork,
             pushedAt: r.pushed_at ? new Date(r.pushed_at) : null,
-          })),
+          },
+          update: {
+            developerId: dev.id,
+            name: r.name,
+            url: r.html_url,
+            description: r.description,
+            stars: r.stargazers_count,
+            language: r.language,
+            isFork: r.fork,
+            pushedAt: r.pushed_at ? new Date(r.pushed_at) : null,
+          },
+        });
+      }
+
+      // Safely remove genuinely obsolete repos when the fetch includes all of the developer's public repos
+      if (ghUser.public_repos <= ghRepos.length || ghUser.public_repos <= 100) {
+        await tx.repo.deleteMany({
+          where: {
+            developerId: dev.id,
+            githubId: { notIn: fetchedGithubIds },
+          },
         });
       }
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Users,
@@ -10,43 +10,71 @@ import {
   RefreshCw,
   AlertTriangle,
   GitCompare,
+  Share2,
+  Check,
+  Search,
+  Copy,
+  Info,
+  X,
 } from 'lucide-react';
 import { Navbar } from '../components/Navbar.js';
+import { SignalInfoModal } from '../components/SignalInfoModal.js';
 import { api } from '../services/api.js';
+import { useToast } from '../context/ToastContext.js';
 import type { DeveloperProfileResponse, Repo } from '../types/index.js';
 
 export const ProfilePage: React.FC = () => {
   const { username } = useParams<{ username: string }>();
   const navigate = useNavigate();
+  const toast = useToast();
 
   const [data, setData] = useState<DeveloperProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<{ code: string; message: string } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Repo sorting: 'stars' | 'activity'
+  // Repo filtering & sorting
   const [sortBy, setSortBy] = useState<'stars' | 'activity'>('stars');
+  const [repoFilterQuery, setRepoFilterQuery] = useState('');
+  const [selectedLanguage, setSelectedLanguage] = useState<string>('all');
 
-  // Pinning modal state
+  // Modals state
   const [pinningRepo, setPinningRepo] = useState<Repo | null>(null);
   const [pinNote, setPinNote] = useState('');
   const [pinLoading, setPinLoading] = useState(false);
+  const [showSignalInfo, setShowSignalInfo] = useState(false);
+
+  // Visual feedback states
+  const [copiedProfile, setCopiedProfile] = useState(false);
+  const [copiedRepoId, setCopiedRepoId] = useState<string | null>(null);
+  const pinTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const fetchProfile = async (forceRefresh = false) => {
     if (!username) return;
-    if (forceRefresh) setRefreshing(true);
-    else setLoading(true);
+    if (forceRefresh) {
+      setRefreshing(true);
+      toast.info('Refetching live developer data from GitHub...');
+    } else {
+      setLoading(true);
+    }
     setError(null);
 
     try {
       const res = await api.developers.get(username, forceRefresh);
       setData(res);
+      if (forceRefresh) {
+        toast.success(`Profile for @${res.developer.username} refreshed!`);
+      }
     } catch (err: any) {
-      setError({
+      const errObj = {
         code: err.code || 'UNKNOWN_ERROR',
         message: err.message || 'Failed to load profile for this developer',
-      });
+      };
+      setError(errObj);
       setData(null);
+      if (forceRefresh) {
+        toast.error(errObj.message);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -55,7 +83,16 @@ export const ProfilePage: React.FC = () => {
 
   useEffect(() => {
     fetchProfile(false);
+    setRepoFilterQuery('');
+    setSelectedLanguage('all');
   }, [username]);
+
+  // Autofocus note textarea when pinning modal opens
+  useEffect(() => {
+    if (pinningRepo) {
+      setTimeout(() => pinTextareaRef.current?.focus(), 50);
+    }
+  }, [pinningRepo]);
 
   const handleTogglePin = async (repo: Repo) => {
     if (repo.isPinned && repo.pinId) {
@@ -71,8 +108,9 @@ export const ProfilePage: React.FC = () => {
             ),
           };
         });
+        toast.info(`Unpinned "${repo.name}"`);
       } catch (err: any) {
-        alert(err.message || 'Failed to unpin repository');
+        toast.error(err.message || 'Failed to unpin repository');
       }
     } else {
       // Open note modal to pin
@@ -97,18 +135,60 @@ export const ProfilePage: React.FC = () => {
           ),
         };
       });
+      toast.success(`Pinned "${pinningRepo.name}" to dashboard!`);
       setPinningRepo(null);
     } catch (err: any) {
-      alert(err.message || 'Failed to pin repository');
+      toast.error(err.message || 'Failed to pin repository');
     } finally {
       setPinLoading(false);
     }
   };
 
-  // Sort repos
-  const sortedRepos = React.useMemo(() => {
+  const handleCopyProfileLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopiedProfile(true);
+      toast.success(`Copied profile URL for @${username}`);
+      setTimeout(() => setCopiedProfile(false), 2000);
+    } catch {
+      toast.error('Failed to copy link to clipboard');
+    }
+  };
+
+  const handleCopyRepoLink = async (repo: Repo) => {
+    try {
+      await navigator.clipboard.writeText(repo.url);
+      setCopiedRepoId(repo.id);
+      toast.success(`Copied URL for "${repo.name}"`);
+      setTimeout(() => setCopiedRepoId(null), 2000);
+    } catch {
+      toast.error('Failed to copy repository link');
+    }
+  };
+
+  // Filter and sort repos
+  const filteredAndSortedRepos = React.useMemo(() => {
     if (!data?.repos) return [];
-    return [...data.repos].sort((a, b) => {
+
+    let list = [...data.repos];
+
+    // Language filter
+    if (selectedLanguage !== 'all') {
+      list = list.filter((r) => r.language === selectedLanguage);
+    }
+
+    // Text filter (name and description)
+    if (repoFilterQuery.trim()) {
+      const q = repoFilterQuery.trim().toLowerCase();
+      list = list.filter(
+        (r) =>
+          r.name.toLowerCase().includes(q) ||
+          (r.description && r.description.toLowerCase().includes(q))
+      );
+    }
+
+    // Sort
+    return list.sort((a, b) => {
       if (sortBy === 'stars') {
         return b.stars - a.stars;
       }
@@ -116,11 +196,11 @@ export const ProfilePage: React.FC = () => {
       const dateB = b.pushedAt ? new Date(b.pushedAt).getTime() : 0;
       return dateB - dateA;
     });
-  }, [data?.repos, sortBy]);
+  }, [data, sortBy, repoFilterQuery, selectedLanguage]);
 
-  // Language count calculation for breakdown chart
-  const languageStats = React.useMemo(() => {
-    if (!data?.repos) return [];
+  // Language count calculation for breakdown chart & filter options
+  const { languageStats, availableLanguages } = React.useMemo(() => {
+    if (!data?.repos) return { languageStats: [], availableLanguages: [] };
     const counts: Record<string, number> = {};
     const owned = data.repos.filter((r) => !r.isFork);
     owned.forEach((r) => {
@@ -130,14 +210,20 @@ export const ProfilePage: React.FC = () => {
     });
 
     const total = Object.values(counts).reduce((a, b) => a + b, 0);
-    return Object.entries(counts)
+    const stats = Object.entries(counts)
       .map(([lang, count]) => ({
         language: lang,
         count,
         percentage: total > 0 ? Math.round((count / total) * 100) : 0,
       }))
       .sort((a, b) => b.count - a.count);
-  }, [data?.repos]);
+
+    const languages = Array.from(
+      new Set(data.repos.map((r) => r.language).filter(Boolean) as string[])
+    ).sort();
+
+    return { languageStats: stats, availableLanguages: languages };
+  }, [data]);
 
   return (
     <div className="min-h-screen bg-transparent text-white">
@@ -159,7 +245,7 @@ export const ProfilePage: React.FC = () => {
 
         {/* Error States according to PRD error codes */}
         {!loading && error && (
-          <div className="p-8 rounded-3xl bg-[#1a0808] border border-[#490000] text-center max-w-xl mx-auto my-12">
+          <div className="p-8 rounded-3xl bg-[#1a0808] border border-[#490000] text-center max-w-xl mx-auto my-12 shadow-2xl">
             <div className="w-12 h-12 rounded-full bg-[#350d0d] border border-[#650000] flex items-center justify-center mx-auto mb-4 text-[#e11d48]">
               <AlertTriangle className="w-6 h-6" />
             </div>
@@ -171,19 +257,36 @@ export const ProfilePage: React.FC = () => {
               {!['USER_NOT_FOUND', 'RATE_LIMITED', 'GITHUB_UNAVAILABLE'].includes(error.code) && 'Unable to Load Profile'}
             </h2>
 
-            <p className="text-sm text-[#94a3b8] mb-6">{error.message}</p>
+            <p className="text-sm text-[#94a3b8] mb-6 leading-relaxed">{error.message}</p>
+
+            {error.code === 'USER_NOT_FOUND' && (
+              <div className="mb-6 p-4 rounded-xl bg-[#0f0606] border border-[#2f0000] text-xs">
+                <span className="text-[#94a3b8] block mb-2">Try inspecting one of these verified developers:</span>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  {['torvalds', 'gaearon', 'yyx990803', 'shadcn'].map((dev) => (
+                    <button
+                      key={dev}
+                      onClick={() => navigate(`/profile/${dev}`)}
+                      className="px-2.5 py-1 rounded-lg bg-[#170909] hover:bg-[#200b0b] border border-[#2f0000] hover:border-[#490000] text-[#fb7185] font-mono cursor-pointer transition-colors"
+                    >
+                      @{dev}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="flex items-center justify-center gap-3">
               <button
                 onClick={() => navigate('/dashboard')}
-                className="px-4 py-2 rounded-xl bg-[#200b0b] hover:bg-[#2f0000] text-xs font-semibold text-[#cbd5e1] transition-colors"
+                className="px-4 py-2 rounded-xl bg-[#200b0b] hover:bg-[#2f0000] text-xs font-semibold text-[#cbd5e1] transition-colors cursor-pointer"
               >
                 Back to Dashboard
               </button>
               {error.code !== 'USER_NOT_FOUND' && (
                 <button
                   onClick={() => fetchProfile(true)}
-                  className="px-4 py-2 rounded-xl bg-[#e11d48] hover:bg-[#ff2d55] text-xs font-semibold text-white shadow-md transition-colors"
+                  className="px-4 py-2 rounded-xl bg-[#e11d48] hover:bg-[#ff2d55] text-xs font-semibold text-white shadow-md transition-colors cursor-pointer"
                 >
                   Retry Request
                 </button>
@@ -197,8 +300,8 @@ export const ProfilePage: React.FC = () => {
           <>
             {/* Stale Cache Notice Banner (PRD Section 9 requirement) */}
             {data.stale && (
-              <div className="p-4 rounded-2xl bg-[#200b0b] border border-[#f59e0b]/50 text-amber-200 text-xs sm:text-sm flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
+              <div className="p-4 rounded-2xl bg-[#200b0b] border border-[#f59e0b]/50 text-amber-200 text-xs sm:text-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg">
+                <div className="flex items-center gap-2.5">
                   <AlertTriangle className="w-4 h-4 text-[#f59e0b] shrink-0" />
                   <span>
                     <strong>Showing cached data:</strong> {data.staleReason || 'GitHub is temporarily unavailable or rate-limited.'}
@@ -207,7 +310,7 @@ export const ProfilePage: React.FC = () => {
                 <button
                   onClick={() => fetchProfile(true)}
                   disabled={refreshing}
-                  className="px-3 py-1 rounded-lg bg-[#350d0d] hover:bg-[#490000] border border-[#f59e0b]/30 text-xs font-medium text-amber-300 transition-colors shrink-0 cursor-pointer"
+                  className="px-3.5 py-1.5 rounded-lg bg-[#350d0d] hover:bg-[#490000] border border-[#f59e0b]/30 text-xs font-semibold text-amber-300 transition-colors shrink-0 cursor-pointer disabled:opacity-50"
                 >
                   {refreshing ? 'Refreshing...' : 'Try Live Refresh'}
                 </button>
@@ -258,7 +361,15 @@ export const ProfilePage: React.FC = () => {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center gap-3 shrink-0 w-full md:w-auto justify-end pt-4 md:pt-0 border-t md:border-t-0 border-[#2f0000]">
+              <div className="flex items-center gap-2.5 shrink-0 w-full md:w-auto justify-end pt-4 md:pt-0 border-t md:border-t-0 border-[#2f0000] flex-wrap">
+                <button
+                  onClick={handleCopyProfileLink}
+                  title="Copy profile link"
+                  className="p-2.5 rounded-xl bg-[#200b0b] hover:bg-[#2f0000] border border-[#2f0000] text-[#94a3b8] hover:text-white transition-colors cursor-pointer"
+                >
+                  {copiedProfile ? <Check className="w-4 h-4 text-emerald-400" /> : <Share2 className="w-4 h-4" />}
+                </button>
+
                 <button
                   onClick={() => fetchProfile(true)}
                   disabled={refreshing}
@@ -272,7 +383,7 @@ export const ProfilePage: React.FC = () => {
                   href={`https://github.com/${data.developer.username}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-4 py-2.5 rounded-xl bg-[#200b0b] hover:bg-[#2f0000] border border-[#2f0000] text-xs font-semibold text-white flex items-center gap-1.5 transition-colors"
+                  className="px-3.5 py-2.5 rounded-xl bg-[#200b0b] hover:bg-[#2f0000] border border-[#2f0000] text-xs font-semibold text-white flex items-center gap-1.5 transition-colors"
                 >
                   <span>GitHub</span>
                   <ExternalLink className="w-3.5 h-3.5 text-[#94a3b8]" />
@@ -280,7 +391,7 @@ export const ProfilePage: React.FC = () => {
 
                 <button
                   onClick={() => navigate(`/compare?users=${data.developer.username}`)}
-                  className="px-4 py-2.5 rounded-xl bg-[#e11d48] hover:bg-[#ff2d55] text-xs font-semibold text-white flex items-center gap-1.5 shadow-md shadow-[#e11d48]/20 transition-all cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl bg-[#e11d48] hover:bg-[#ff2d55] text-xs font-semibold text-white flex items-center gap-1.5 shadow-md shadow-[#e11d48]/20 transition-all cursor-pointer active:scale-95"
                 >
                   <GitCompare className="w-3.5 h-3.5" />
                   <span>Compare</span>
@@ -290,18 +401,26 @@ export const ProfilePage: React.FC = () => {
 
             {/* Signature Feature: The 4 Signal Scores */}
             <section className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-[#e11d48] animate-pulse" />
                     <h2 className="text-lg font-bold text-white tracking-tight">Signal Scores</h2>
+                    <button
+                      onClick={() => setShowSignalInfo(true)}
+                      className="px-2 py-0.5 rounded-md bg-[#200b0b] hover:bg-[#350d0d] border border-[#2f0000] text-[11px] text-[#fb7185] hover:text-white transition-colors cursor-pointer flex items-center gap-1 ml-1"
+                      title="Explain Signal Score formulas"
+                    >
+                      <Info className="w-3 h-3" />
+                      <span>Explain Formulas</span>
+                    </button>
                   </div>
                   <p className="text-xs text-[#94a3b8] mt-0.5">
                     Deterministic indicators (0–100) computed from owned repos. Heuristics, not absolute rankings.
                   </p>
                 </div>
 
-                <span className="text-[11px] font-mono text-[#fb7185] px-2.5 py-1 rounded-md bg-[#200b0b] border border-[#350d0d]">
+                <span className="text-[11px] font-mono text-[#fb7185] px-2.5 py-1 rounded-md bg-[#200b0b] border border-[#350d0d] self-start sm:self-auto">
                   {data.signals.summary.dataQualityNote}
                 </span>
               </div>
@@ -310,7 +429,7 @@ export const ProfilePage: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 
                 {/* 1. Reach */}
-                <div className="p-5 rounded-2xl bg-[#170909] border border-[#2f0000] relative group hover:border-[#490000] transition-all">
+                <div className="p-5 rounded-2xl bg-[#170909] border border-[#2f0000] relative group hover:border-[#490000] transition-all shadow-md">
                   <div className="flex items-center justify-between text-xs text-[#94a3b8] mb-2">
                     <span className="font-semibold uppercase tracking-wider text-[#fb7185]">Reach</span>
                     <span className="text-xs font-mono">{typeof data.signals.reach.raw === 'number' ? data.signals.reach.raw.toLocaleString() : data.signals.reach.raw} followers</span>
@@ -340,7 +459,7 @@ export const ProfilePage: React.FC = () => {
                 </div>
 
                 {/* 2. Impact */}
-                <div className="p-5 rounded-2xl bg-[#170909] border border-[#2f0000] relative group hover:border-[#490000] transition-all">
+                <div className="p-5 rounded-2xl bg-[#170909] border border-[#2f0000] relative group hover:border-[#490000] transition-all shadow-md">
                   <div className="flex items-center justify-between text-xs text-[#94a3b8] mb-2">
                     <span className="font-semibold uppercase tracking-wider text-[#f59e0b]">Impact</span>
                     <span className="text-xs font-mono">{typeof data.signals.impact.raw === 'number' ? data.signals.impact.raw.toLocaleString() : data.signals.impact.raw} stars</span>
@@ -373,7 +492,7 @@ export const ProfilePage: React.FC = () => {
                 </div>
 
                 {/* 3. Activity */}
-                <div className="p-5 rounded-2xl bg-[#170909] border border-[#2f0000] relative group hover:border-[#490000] transition-all">
+                <div className="p-5 rounded-2xl bg-[#170909] border border-[#2f0000] relative group hover:border-[#490000] transition-all shadow-md">
                   <div className="flex items-center justify-between text-xs text-[#94a3b8] mb-2">
                     <span className="font-semibold uppercase tracking-wider text-[#10b981]">Activity</span>
                     <span className="text-xs font-mono">{data.signals.activity.raw}</span>
@@ -406,7 +525,7 @@ export const ProfilePage: React.FC = () => {
                 </div>
 
                 {/* 4. Breadth */}
-                <div className="p-5 rounded-2xl bg-[#170909] border border-[#2f0000] relative group hover:border-[#490000] transition-all">
+                <div className="p-5 rounded-2xl bg-[#170909] border border-[#2f0000] relative group hover:border-[#490000] transition-all shadow-md">
                   <div className="flex items-center justify-between text-xs text-[#94a3b8] mb-2">
                     <span className="font-semibold uppercase tracking-wider text-[#38bdf8]">Breadth</span>
                     <span className="text-xs font-mono">{data.signals.breadth.raw} languages</span>
@@ -440,8 +559,8 @@ export const ProfilePage: React.FC = () => {
 
             {/* Language Distribution Breakdown */}
             {languageStats.length > 0 && (
-              <section className="p-6 rounded-2xl bg-[#170909] border border-[#2f0000]">
-                <div className="flex items-center justify-between mb-4">
+              <section className="p-6 rounded-2xl bg-[#170909] border border-[#2f0000] shadow-md">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
                   <div className="flex items-center gap-2">
                     <Code2 className="w-4 h-4 text-[#38bdf8]" />
                     <h3 className="text-sm font-bold text-white">Language Distribution</h3>
@@ -472,49 +591,81 @@ export const ProfilePage: React.FC = () => {
               </section>
             )}
 
-            {/* Sortable Repositories Table */}
-            <section className="rounded-2xl bg-[#170909] border border-[#2f0000] overflow-hidden">
-              <div className="p-5 border-b border-[#2f0000] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <h3 className="text-base font-bold text-white">Repositories</h3>
-                  <p className="text-xs text-[#94a3b8] mt-0.5">
-                    {data.developer.publicRepos > sortedRepos.length ? (
-                      <span>
-                        Showing first <strong className="text-white">{sortedRepos.length}</strong> of <strong className="text-[#fb7185]">{data.developer.publicRepos}</strong> public repositories ({data.signals.summary.totalOwnedRepos} owned, {sortedRepos.filter(r => r.isFork).length} forks).
-                      </span>
-                    ) : (
-                      <span>
-                        Showing <strong className="text-white">{sortedRepos.length}</strong> repositories ({data.signals.summary.totalOwnedRepos} owned, {sortedRepos.filter(r => r.isFork).length} forks).
-                      </span>
-                    )}
-                  </p>
+            {/* Repositories Table Section with Real-Time Filtering */}
+            <section className="rounded-2xl bg-[#170909] border border-[#2f0000] overflow-hidden shadow-lg">
+              <div className="p-5 border-b border-[#2f0000] flex flex-col gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-base font-bold text-white">Repositories</h3>
+                    <p className="text-xs text-[#94a3b8] mt-0.5">
+                      Showing <strong className="text-white">{filteredAndSortedRepos.length}</strong> of{' '}
+                      <strong className="text-white">{data.repos.length}</strong> loaded repos ({data.signals.summary.totalOwnedRepos} owned, {data.repos.filter(r => r.isFork).length} forks).
+                    </p>
+                  </div>
+
+                  {/* Sort Controls */}
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <span className="text-xs text-[#64748b]">Sort:</span>
+                    <div className="inline-flex rounded-xl bg-[#0f0606] p-1 border border-[#2f0000]">
+                      <button
+                        onClick={() => setSortBy('stars')}
+                        className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                          sortBy === 'stars'
+                            ? 'bg-[#350d0d] text-[#fb7185] border border-[#490000]'
+                            : 'text-[#94a3b8] hover:text-white'
+                        }`}
+                      >
+                        Most Stars
+                      </button>
+                      <button
+                        onClick={() => setSortBy('activity')}
+                        className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                          sortBy === 'activity'
+                            ? 'bg-[#350d0d] text-[#fb7185] border border-[#490000]'
+                            : 'text-[#94a3b8] hover:text-white'
+                        }`}
+                      >
+                        Recent Activity
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Sort Toggle Controls */}
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-[#64748b]">Sort by:</span>
-                  <div className="inline-flex rounded-xl bg-[#0f0606] p-1 border border-[#2f0000]">
-                    <button
-                      onClick={() => setSortBy('stars')}
-                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                        sortBy === 'stars'
-                          ? 'bg-[#350d0d] text-[#fb7185] border border-[#490000]'
-                          : 'text-[#94a3b8] hover:text-white'
-                      }`}
-                    >
-                      Most Stars
-                    </button>
-                    <button
-                      onClick={() => setSortBy('activity')}
-                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                        sortBy === 'activity'
-                          ? 'bg-[#350d0d] text-[#fb7185] border border-[#490000]'
-                          : 'text-[#94a3b8] hover:text-white'
-                      }`}
-                    >
-                      Recent Activity
-                    </button>
+                {/* Search & Filter Toolbar for Repositories */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
+                  <div className="relative flex-1">
+                    <Search className="w-3.5 h-3.5 text-[#64748b] absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={repoFilterQuery}
+                      onChange={(e) => setRepoFilterQuery(e.target.value)}
+                      placeholder="Filter repositories by name or description..."
+                      className="w-full pl-8 pr-8 py-1.5 rounded-xl bg-[#0f0606] border border-[#2f0000] text-xs text-white placeholder-[#64748b] focus:outline-none focus:border-[#e11d48]"
+                    />
+                    {repoFilterQuery && (
+                      <button
+                        onClick={() => setRepoFilterQuery('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#64748b] hover:text-white"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
+
+                  {availableLanguages.length > 0 && (
+                    <select
+                      value={selectedLanguage}
+                      onChange={(e) => setSelectedLanguage(e.target.value)}
+                      className="px-3 py-1.5 rounded-xl bg-[#0f0606] border border-[#2f0000] text-xs text-[#cbd5e1] focus:outline-none focus:border-[#e11d48] cursor-pointer"
+                    >
+                      <option value="all">All Languages ({data.repos.length})</option>
+                      {availableLanguages.map((lang) => (
+                        <option key={lang} value={lang}>
+                          {lang}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               </div>
 
@@ -531,84 +682,103 @@ export const ProfilePage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#2f0000]/60">
-                    {sortedRepos.map((repo) => (
-                      <tr
-                        key={repo.id}
-                        className={`hover:bg-[#200b0b]/50 transition-colors ${
-                          repo.isPinned ? 'bg-[#200b0b]/30' : ''
-                        }`}
-                      >
-                        <td className="py-3.5 px-5">
-                          <div className="flex items-center gap-2">
-                            <a
-                              href={repo.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="font-semibold text-white hover:text-[#fb7185] flex items-center gap-1.5 transition-colors"
-                            >
-                              <span>{repo.name}</span>
-                              <ExternalLink className="w-3 h-3 text-[#64748b]" />
-                            </a>
-                            {repo.isFork && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#200b0b] text-[#94a3b8] border border-[#350d0d]">
-                                Fork
-                              </span>
-                            )}
-                            {repo.isPinned && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#350d0d] text-[#fb7185] border border-[#490000] flex items-center gap-1">
-                                <Pin className="w-2.5 h-2.5 fill-current" />
-                                Pinned
-                              </span>
-                            )}
-                          </div>
-                          {repo.description && (
-                            <p className="text-xs text-[#94a3b8] mt-1 line-clamp-1 max-w-xl">
-                              {repo.description}
-                            </p>
-                          )}
-                          {repo.pinNote && (
-                            <p className="text-xs text-[#fb7185] mt-1 italic">
-                              Note: "{repo.pinNote}"
-                            </p>
-                          )}
-                        </td>
-
-                        <td className="py-3.5 px-4 font-mono text-xs text-[#cbd5e1]">
-                          {repo.language || <span className="text-[#64748b]">—</span>}
-                        </td>
-
-                        <td className="py-3.5 px-4 font-mono text-xs text-white">
-                          <span className="flex items-center gap-1">
-                            <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-                            {repo.stars.toLocaleString()}
-                          </span>
-                        </td>
-
-                        <td className="py-3.5 px-4 font-mono text-xs text-[#94a3b8]">
-                          {repo.pushedAt
-                            ? new Date(repo.pushedAt).toLocaleDateString(undefined, {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric',
-                              })
-                            : '—'}
-                        </td>
-
-                        <td className="py-3.5 px-5 text-right">
-                          <button
-                            onClick={() => handleTogglePin(repo)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 ml-auto transition-all cursor-pointer ${
-                              repo.isPinned
-                                ? 'bg-[#350d0d] text-[#fb7185] border border-[#490000] hover:bg-red-950/60'
-                                : 'bg-[#0f0606] text-[#94a3b8] hover:text-white border border-[#2f0000] hover:border-[#490000]'
-                            }`}
-                          >
-                            <Pin className={`w-3.5 h-3.5 ${repo.isPinned ? 'fill-current' : ''}`} />
-                            <span>{repo.isPinned ? 'Pinned' : 'Pin'}</span>
-                          </button>
+                    {filteredAndSortedRepos.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-10 text-center text-[#64748b] text-xs">
+                          No repositories match "{repoFilterQuery}".
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      filteredAndSortedRepos.map((repo) => (
+                        <tr
+                          key={repo.id}
+                          className={`hover:bg-[#200b0b]/50 transition-colors ${
+                            repo.isPinned ? 'bg-[#200b0b]/30' : ''
+                          }`}
+                        >
+                          <td className="py-3.5 px-5">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <a
+                                href={repo.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-semibold text-white hover:text-[#fb7185] flex items-center gap-1.5 transition-colors"
+                              >
+                                <span>{repo.name}</span>
+                                <ExternalLink className="w-3 h-3 text-[#64748b]" />
+                              </a>
+                              <button
+                                onClick={() => handleCopyRepoLink(repo)}
+                                className="text-[#64748b] hover:text-[#fb7185] transition-colors p-0.5"
+                                title="Copy repo URL"
+                              >
+                                {copiedRepoId === repo.id ? (
+                                  <Check className="w-3 h-3 text-emerald-400" />
+                                ) : (
+                                  <Copy className="w-3 h-3" />
+                                )}
+                              </button>
+                              {repo.isFork && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#200b0b] text-[#94a3b8] border border-[#350d0d]">
+                                  Fork
+                                </span>
+                              )}
+                              {repo.isPinned && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#350d0d] text-[#fb7185] border border-[#490000] flex items-center gap-1">
+                                  <Pin className="w-2.5 h-2.5 fill-current" />
+                                  Pinned
+                                </span>
+                              )}
+                            </div>
+                            {repo.description && (
+                              <p className="text-xs text-[#94a3b8] mt-1 line-clamp-1 max-w-xl">
+                                {repo.description}
+                              </p>
+                            )}
+                            {repo.pinNote && (
+                              <p className="text-xs text-[#fb7185] mt-1 italic">
+                                Note: "{repo.pinNote}"
+                              </p>
+                            )}
+                          </td>
+
+                          <td className="py-3.5 px-4 font-mono text-xs text-[#cbd5e1]">
+                            {repo.language || <span className="text-[#64748b]">—</span>}
+                          </td>
+
+                          <td className="py-3.5 px-4 font-mono text-xs text-white">
+                            <span className="flex items-center gap-1">
+                              <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+                              {repo.stars.toLocaleString()}
+                            </span>
+                          </td>
+
+                          <td className="py-3.5 px-4 font-mono text-xs text-[#94a3b8]">
+                            {repo.pushedAt
+                              ? new Date(repo.pushedAt).toLocaleDateString(undefined, {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric',
+                                })
+                              : '—'}
+                          </td>
+
+                          <td className="py-3.5 px-5 text-right">
+                            <button
+                              onClick={() => handleTogglePin(repo)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 ml-auto transition-all cursor-pointer ${
+                                repo.isPinned
+                                  ? 'bg-[#350d0d] text-[#fb7185] border border-[#490000] hover:bg-red-950/60'
+                                  : 'bg-[#0f0606] text-[#94a3b8] hover:text-white border border-[#2f0000] hover:border-[#490000]'
+                              }`}
+                            >
+                              <Pin className={`w-3.5 h-3.5 ${repo.isPinned ? 'fill-current' : ''}`} />
+                              <span>{repo.isPinned ? 'Pinned' : 'Pin'}</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -619,25 +789,49 @@ export const ProfilePage: React.FC = () => {
 
       {/* Pin with Note Modal */}
       {pinningRepo && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-[#170909] border border-[#2f0000] rounded-2xl p-6 shadow-2xl">
-            <h3 className="text-lg font-bold text-white mb-1">
-              Pin <span className="text-[#fb7185] font-mono">{pinningRepo.name}</span>
-            </h3>
+        <div
+          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setPinningRepo(null)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setPinningRepo(null);
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') handleConfirmPin();
+          }}
+        >
+          <div
+            className="w-full max-w-md bg-[#170909] border border-[#2f0000] rounded-2xl p-6 shadow-2xl relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-lg font-bold text-white">
+                Pin <span className="text-[#fb7185] font-mono">{pinningRepo.name}</span>
+              </h3>
+              <button
+                onClick={() => setPinningRepo(null)}
+                className="text-[#64748b] hover:text-white p-1 rounded cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
             <p className="text-xs text-[#94a3b8] mb-4">
               Pinned repos appear on your dashboard. You can add an optional evaluation note.
             </p>
 
             <textarea
+              ref={pinTextareaRef}
               value={pinNote}
               onChange={(e) => setPinNote(e.target.value)}
-              placeholder="e.g. Great implementation of WebSocket syncing; clean TypeScript types..."
+              placeholder="e.g. Great architecture, clean TypeScript abstractions, used in production..."
               rows={3}
               maxLength={500}
               className="w-full p-3 rounded-xl bg-[#0f0606] border border-[#2f0000] text-sm text-white placeholder-[#64748b] focus:outline-none focus:border-[#e11d48] focus:ring-1 focus:ring-[#e11d48]"
             />
 
-            <div className="flex items-center justify-end gap-3 mt-4">
+            <div className="flex items-center justify-between text-[11px] text-[#64748b] mt-1 mb-4">
+              <span>Press <kbd className="px-1 py-0.5 rounded bg-[#200b0b] border border-[#2f0000] font-mono">Ctrl+Enter</kbd> to pin</span>
+              <span>{pinNote.length}/500</span>
+            </div>
+
+            <div className="flex items-center justify-end gap-3">
               <button
                 type="button"
                 onClick={() => setPinningRepo(null)}
@@ -657,6 +851,9 @@ export const ProfilePage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Signal Scores Explanation Modal */}
+      <SignalInfoModal isOpen={showSignalInfo} onClose={() => setShowSignalInfo(false)} />
     </div>
   );
 };

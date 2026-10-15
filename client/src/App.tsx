@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext.js';
+import { ToastProvider } from './context/ToastContext.js';
 import { AmbientBackground } from './components/AmbientBackground.js';
 import { AuthPage } from './pages/AuthPage.js';
 import { DashboardPage } from './pages/DashboardPage.js';
@@ -47,8 +48,9 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
 export function App() {
   return (
-    <AuthProvider>
-      <div className="relative min-h-screen bg-[#0f0606] text-white selection:bg-[#e11d48] selection:text-white overflow-x-hidden">
+    <ToastProvider>
+      <AuthProvider>
+        <div className="relative min-h-screen bg-[#0f0606] text-white selection:bg-[#e11d48] selection:text-white overflow-x-hidden">
         {/* Cinematic Crimson Light Rays & Telemetry Grid */}
         <AmbientBackground />
 
@@ -94,6 +96,7 @@ export function App() {
         </div>
       </div>
     </AuthProvider>
+    </ToastProvider>
   );
 }
 

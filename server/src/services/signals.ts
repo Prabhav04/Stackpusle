@@ -172,12 +172,18 @@ export function calculateDeveloperSignals(
   // Total stars from owned repos
   const totalStars = ownedRepos.reduce((acc, r) => acc + (r.stars || 0), 0);
 
-  // Active repos in last 90 days
-  const nowMs = referenceDate.getTime();
+  // Active repos in last 90 days (excluding future dates and handling invalid/missing timestamps)
+  const nowMs = referenceDate instanceof Date && !isNaN(referenceDate.getTime())
+    ? referenceDate.getTime()
+    : Date.now();
+
   const activeReposCount = ownedRepos.filter((r) => {
     if (!r.pushedAt) return false;
-    const pushedMs = new Date(r.pushedAt).getTime();
-    return !isNaN(pushedMs) && nowMs - pushedMs <= NINETY_DAYS_MS;
+    const pushedDate = new Date(r.pushedAt);
+    const pushedMs = pushedDate.getTime();
+    if (isNaN(pushedMs)) return false;
+    // Must be pushed on or before reference date (not in future) and within 90 days
+    return pushedMs <= nowMs && (nowMs - pushedMs) <= NINETY_DAYS_MS;
   }).length;
 
   // Distinct primary languages (ignoring null or empty strings)
@@ -189,10 +195,13 @@ export function calculateDeveloperSignals(
   });
   const distinctLanguagesCount = languageSet.size;
 
+  const totalAnalyzed = (repos || []).length;
   const dataQualityNote =
-    publicRepos > repos.length
-      ? `Metrics based on sample of ${repos.length} of ${publicRepos} public repos`
-      : `Complete sample of ${repos.length} repos analyzed`;
+    totalAnalyzed === 0
+      ? 'No public repositories found to analyze'
+      : publicRepos > totalAnalyzed
+      ? `Metrics based on sample of ${totalAnalyzed} of ${publicRepos} public repos`
+      : `Complete sample of ${totalAnalyzed} repos analyzed`;
 
   return {
     reach: calculateReach(followers),

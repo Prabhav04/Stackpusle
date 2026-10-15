@@ -185,5 +185,120 @@ describe('Signal Scores Calculations', () => {
       // Reach: 999 followers -> 25 * log10(1000) = 25 * 3 = 75
       expect(result.reach.score).toBe(75);
     });
+
+    it('excludes future timestamps from activity calculation', () => {
+      const futureRepo: RepoData = {
+        id: 'future-1',
+        name: 'future-commit',
+        stars: 10,
+        language: 'TypeScript',
+        isFork: false,
+        pushedAt: '2026-10-15T00:00:00Z', // 14 hours in future relative to fixedNow
+      };
+
+      const result = calculateDeveloperSignals(
+        {
+          followers: 10,
+          publicRepos: 1,
+          repos: [futureRepo],
+        },
+        fixedNow
+      );
+
+      expect(result.summary.activeReposCount).toBe(0);
+      expect(result.activity.score).toBe(0);
+      expect(result.activity.raw).toBe('0/1');
+    });
+
+    it('handles exact 90-day boundary dates correctly', () => {
+      const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
+      const exact90DaysAgo = new Date(fixedNow.getTime() - NINETY_DAYS_MS).toISOString();
+      const ninetyDaysAndOneSecAgo = new Date(fixedNow.getTime() - NINETY_DAYS_MS - 1000).toISOString();
+
+      const boundaryRepos: RepoData[] = [
+        {
+          id: 'exact-boundary',
+          name: 'exact-repo',
+          stars: 5,
+          language: 'Go',
+          isFork: false,
+          pushedAt: exact90DaysAgo, // Exactly 90 days ago -> should count
+        },
+        {
+          id: 'past-boundary',
+          name: 'past-repo',
+          stars: 5,
+          language: 'Go',
+          isFork: false,
+          pushedAt: ninetyDaysAndOneSecAgo, // 90 days + 1 sec -> should NOT count
+        },
+      ];
+
+      const result = calculateDeveloperSignals(
+        {
+          followers: 10,
+          publicRepos: 2,
+          repos: boundaryRepos,
+        },
+        fixedNow
+      );
+
+      expect(result.summary.activeReposCount).toBe(1);
+      expect(result.activity.score).toBe(50);
+      expect(result.activity.raw).toBe('1/2');
+    });
+
+    it('handles invalid date strings, nulls, and missing pushedAt safely without throwing', () => {
+      const malformedRepos: RepoData[] = [
+        {
+          id: 'invalid-date',
+          name: 'bad-date',
+          stars: 2,
+          language: 'JavaScript',
+          isFork: false,
+          pushedAt: 'not-a-valid-date-string',
+        },
+        {
+          id: 'null-date',
+          name: 'null-date',
+          stars: 2,
+          language: 'JavaScript',
+          isFork: false,
+          pushedAt: null,
+        },
+      ];
+
+      const result = calculateDeveloperSignals(
+        {
+          followers: 10,
+          publicRepos: 2,
+          repos: malformedRepos,
+        },
+        fixedNow
+      );
+
+      expect(result.summary.activeReposCount).toBe(0);
+      expect(result.activity.score).toBe(0);
+      expect(result.activity.raw).toBe('0/2');
+    });
+
+    it('handles empty repositories array cleanly with accurate data quality labels', () => {
+      const result = calculateDeveloperSignals(
+        {
+          followers: 0,
+          publicRepos: 0,
+          repos: [],
+        },
+        fixedNow
+      );
+
+      expect(result.summary.totalOwnedRepos).toBe(0);
+      expect(result.summary.totalStars).toBe(0);
+      expect(result.summary.activeReposCount).toBe(0);
+      expect(result.summary.distinctLanguagesCount).toBe(0);
+      expect(result.activity.isAvailable).toBe(false);
+      expect(result.activity.raw).toBe('unavailable');
+      expect(result.summary.dataQualityNote).toBe('No public repositories found to analyze');
+    });
   });
 });

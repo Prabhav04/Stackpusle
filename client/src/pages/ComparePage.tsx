@@ -8,6 +8,8 @@ import {
   Trophy,
   Check,
   AlertTriangle,
+  Share2,
+  Info,
 } from 'lucide-react';
 import {
   Radar,
@@ -24,7 +26,9 @@ import {
   Legend,
 } from 'recharts';
 import { Navbar } from '../components/Navbar.js';
+import { SignalInfoModal } from '../components/SignalInfoModal.js';
 import { api } from '../services/api.js';
+import { useToast } from '../context/ToastContext.js';
 import type { ComparisonResponse } from '../types/index.js';
 
 const DEVELOPER_COLORS = [
@@ -42,6 +46,7 @@ const PRESET_COMPARISONS = [
 export const ComparePage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const toast = useToast();
 
   const rawUsers = searchParams.get('users');
   const initialUsers = rawUsers
@@ -61,6 +66,12 @@ export const ComparePage: React.FC = () => {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [savedComparisonName, setSavedComparisonName] = useState<string | null>(null);
+
+  // Signal info modal
+  const [showSignalInfo, setShowSignalInfo] = useState(false);
+
+  // Share visual feedback
+  const [copiedLink, setCopiedLink] = useState(false);
 
   const runComparison = async (usersToCompare: string[]) => {
     if (usersToCompare.length < 2) {
@@ -86,10 +97,12 @@ export const ComparePage: React.FC = () => {
       setSavedComparisonName(res.savedComparisonName || null);
       setSearchParams({ users: usersToCompare.join(',') });
     } catch (err: any) {
-      setError(err.message || 'Failed to compare developers');
+      const msg = err.message || 'Failed to compare developers';
+      setError(msg);
       setData(null);
       setIsSaved(false);
       setSavedComparisonName(null);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -107,24 +120,26 @@ export const ComparePage: React.FC = () => {
     if (!clean) return;
 
     if (usernames.includes(clean)) {
-      alert('This developer is already in the comparison list');
+      toast.warning(`@${clean} is already in the comparison list`);
       return;
     }
 
     if (usernames.length >= 3) {
-      alert('Maximum 3 developers can be compared simultaneously');
+      toast.warning('Maximum 3 developers can be compared simultaneously');
       return;
     }
 
     const next = [...usernames, clean];
     setUsernames(next);
     setInputUsername('');
+    toast.success(`Added @${clean} to comparison`);
     runComparison(next);
   };
 
   const handleRemoveUser = (userToRemove: string) => {
     const next = usernames.filter((u) => u !== userToRemove);
     setUsernames(next);
+    toast.info(`Removed @${userToRemove} from comparison`);
     if (next.length >= 2) {
       runComparison(next);
     } else {
@@ -143,13 +158,25 @@ export const ComparePage: React.FC = () => {
       setSaveSuccess(true);
       setIsSaved(true);
       setSavedComparisonName(saveName.trim());
+      toast.success(`Comparison "${saveName.trim()}" saved to dashboard!`);
       setTimeout(() => {
         setIsSaving(false);
-      }, 1500);
+      }, 1200);
     } catch (err: any) {
-      alert(err.message || 'Failed to save comparison');
+      toast.error(err.message || 'Failed to save comparison');
     } finally {
       setSaveLoading(false);
+    }
+  };
+
+  const handleCopyComparisonLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopiedLink(true);
+      toast.success('Comparison link copied to clipboard!');
+      setTimeout(() => setCopiedLink(false), 2000);
+    } catch {
+      toast.error('Failed to copy link to clipboard');
     }
   };
 
@@ -173,7 +200,7 @@ export const ComparePage: React.FC = () => {
       });
       return item;
     });
-  }, [data?.developers]);
+  }, [data]);
 
   return (
     <div className="min-h-screen bg-transparent text-white">
@@ -195,41 +222,63 @@ export const ComparePage: React.FC = () => {
             </p>
           </div>
 
-          {/* Save Comparison Action */}
-          {data?.developers && data.developers.length >= 2 && (
-            isSaved ? (
-              <button
-                disabled
-                className="px-4 py-2.5 rounded-xl bg-[#14231b] border border-emerald-500/40 text-xs font-semibold text-emerald-400 flex items-center gap-2 cursor-default shadow-sm self-start md:self-center"
-                title={savedComparisonName ? `Saved as "${savedComparisonName}"` : 'Saved to dashboard'}
-              >
-                <Check className="w-4 h-4 text-emerald-400" />
-                <span>Saved</span>
-                {savedComparisonName && (
-                  <span className="text-[11px] text-emerald-400/80 font-normal max-w-[160px] truncate">
-                    ({savedComparisonName})
-                  </span>
+          {/* Action Buttons: Explain, Share, Save */}
+          <div className="flex items-center gap-2.5 flex-wrap self-start md:self-center">
+            <button
+              onClick={() => setShowSignalInfo(true)}
+              className="px-3 py-2 rounded-xl bg-[#200b0b] hover:bg-[#350d0d] border border-[#2f0000] hover:border-[#490000] text-xs font-semibold text-[#fb7185] flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Explain deterministic scoring formulas"
+            >
+              <Info className="w-3.5 h-3.5" />
+              <span>Explain Scores</span>
+            </button>
+
+            {data?.developers && data.developers.length >= 2 && (
+              <>
+                <button
+                  onClick={handleCopyComparisonLink}
+                  className="px-3 py-2 rounded-xl bg-[#200b0b] hover:bg-[#350d0d] border border-[#2f0000] hover:border-[#490000] text-xs font-semibold text-[#cbd5e1] flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="Copy comparison link"
+                >
+                  {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
+                  <span>Share</span>
+                </button>
+
+                {isSaved ? (
+                  <button
+                    disabled
+                    className="px-4 py-2 rounded-xl bg-[#14231b] border border-emerald-500/40 text-xs font-semibold text-emerald-400 flex items-center gap-2 cursor-default shadow-sm"
+                    title={savedComparisonName ? `Saved as "${savedComparisonName}"` : 'Saved to dashboard'}
+                  >
+                    <Check className="w-4 h-4 text-emerald-400" />
+                    <span>Saved</span>
+                    {savedComparisonName && (
+                      <span className="text-[11px] text-emerald-400/80 font-normal max-w-[140px] truncate">
+                        ({savedComparisonName})
+                      </span>
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setSaveName(
+                        `${data.developers.map((d) => d.developer.username).join(' vs ')}`
+                      );
+                      setIsSaving(true);
+                    }}
+                    className="px-4 py-2 rounded-xl bg-[#e11d48] hover:bg-[#ff2d55] text-xs font-semibold text-white flex items-center gap-2 transition-all cursor-pointer shadow-md shadow-[#e11d48]/20 active:scale-95"
+                  >
+                    <Bookmark className="w-4 h-4 text-white" />
+                    <span>Save Comparison</span>
+                  </button>
                 )}
-              </button>
-            ) : (
-              <button
-                onClick={() => {
-                  setSaveName(
-                    `${data.developers.map((d) => d.developer.username).join(' vs ')}`
-                  );
-                  setIsSaving(true);
-                }}
-                className="px-4 py-2.5 rounded-xl bg-[#200b0b] hover:bg-[#350d0d] border border-[#2f0000] hover:border-[#490000] text-xs font-semibold text-[#fb7185] flex items-center gap-2 transition-all cursor-pointer shadow-md self-start md:self-center"
-              >
-                <Bookmark className="w-4 h-4 text-[#e11d48]" />
-                <span>Save Comparison</span>
-              </button>
-            )
-          )}
+              </>
+            )}
+          </div>
         </div>
 
         {/* Developer Chips & Add Input */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 flex-wrap bg-[#170909] p-4 rounded-2xl border border-[#2f0000]">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 flex-wrap bg-[#170909] p-4 rounded-2xl border border-[#2f0000] shadow-md">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-[#94a3b8] font-semibold uppercase tracking-wider mr-1">
               Comparing ({usernames.length}/3):
@@ -246,7 +295,8 @@ export const ComparePage: React.FC = () => {
                   <span>@{u}</span>
                   <button
                     onClick={() => handleRemoveUser(u)}
-                    className="text-[#64748b] hover:text-white transition-colors cursor-pointer"
+                    className="text-[#64748b] hover:text-white transition-colors cursor-pointer p-0.5 rounded hover:bg-white/10"
+                    title={`Remove @${u}`}
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -262,12 +312,12 @@ export const ComparePage: React.FC = () => {
                 type="text"
                 value={inputUsername}
                 onChange={(e) => setInputUsername(e.target.value)}
-                placeholder="Add username..."
+                placeholder="Add username (e.g. torvalds)..."
                 className="px-3 py-1.5 rounded-xl bg-[#0f0606] border border-[#2f0000] text-xs text-white placeholder-[#64748b] focus:outline-none focus:border-[#e11d48]"
               />
               <button
                 type="submit"
-                className="px-3 py-1.5 rounded-xl bg-[#e11d48] hover:bg-[#ff2d55] text-xs font-semibold text-white flex items-center gap-1 cursor-pointer transition-colors"
+                className="px-3.5 py-1.5 rounded-xl bg-[#e11d48] hover:bg-[#ff2d55] text-xs font-semibold text-white flex items-center gap-1 cursor-pointer transition-colors active:scale-95"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add</span>
@@ -284,6 +334,7 @@ export const ComparePage: React.FC = () => {
               key={p.label}
               onClick={() => {
                 setUsernames(p.users);
+                toast.info(`Loaded preset: ${p.label}`);
                 runComparison(p.users);
               }}
               className="px-2.5 py-1 rounded-lg bg-[#170909] hover:bg-[#200b0b] border border-[#2f0000] text-[#cbd5e1] hover:text-[#fb7185] transition-colors cursor-pointer font-medium"
@@ -323,19 +374,30 @@ export const ComparePage: React.FC = () => {
 
         {/* Error State */}
         {!loading && error && (
-          <div className="p-8 rounded-3xl bg-[#1a0808] border border-[#490000] text-center max-w-lg mx-auto">
+          <div className="p-8 rounded-3xl bg-[#1a0808] border border-[#490000] text-center max-w-lg mx-auto shadow-2xl">
             <AlertTriangle className="w-10 h-10 text-[#e11d48] mx-auto mb-3" />
             <h3 className="text-base font-bold text-white mb-1">Comparison Error</h3>
             <p className="text-sm text-[#cbd5e1] mb-2">{error}</p>
-            <p className="text-xs text-[#94a3b8]">
+            <p className="text-xs text-[#94a3b8] mb-4">
               Verify that GitHub usernames are valid, spelled correctly, and exist.
             </p>
+            <div className="flex items-center justify-center gap-2">
+              <button
+                onClick={() => {
+                  setUsernames(['gaearon', 'yyx990803']);
+                  runComparison(['gaearon', 'yyx990803']);
+                }}
+                className="px-3.5 py-1.5 rounded-xl bg-[#e11d48] hover:bg-[#ff2d55] text-xs font-semibold text-white transition-colors cursor-pointer"
+              >
+                Reset to Gaearon vs Evan You
+              </button>
+            </div>
           </div>
         )}
 
         {/* Empty State when fewer than 2 developers */}
         {!loading && !error && (!data || data.developers.length < 2) && (
-          <div className="p-12 text-center rounded-3xl bg-[#170909] border border-[#2f0000] max-w-xl mx-auto my-8">
+          <div className="p-12 text-center rounded-3xl bg-[#170909] border border-[#2f0000] max-w-xl mx-auto my-8 shadow-xl">
             <GitCompare className="w-12 h-12 text-[#e11d48] mx-auto mb-3 opacity-60" />
             <h3 className="text-lg font-bold text-white mb-1">Add Developers to Compare</h3>
             <p className="text-xs text-[#94a3b8] mb-6">
@@ -347,6 +409,7 @@ export const ComparePage: React.FC = () => {
                   key={p.label}
                   onClick={() => {
                     setUsernames(p.users);
+                    toast.info(`Loaded preset: ${p.label}`);
                     runComparison(p.users);
                   }}
                   className="px-3 py-1.5 rounded-xl bg-[#200b0b] hover:bg-[#350d0d] border border-[#2f0000] text-xs font-semibold text-[#fb7185] transition-colors cursor-pointer"
@@ -374,7 +437,7 @@ export const ComparePage: React.FC = () => {
                 return (
                   <div
                     key={d.developer.id}
-                    className="p-6 rounded-3xl bg-[#170909] border border-[#2f0000] flex flex-col justify-between shadow-xl relative overflow-hidden"
+                    className="p-6 rounded-3xl bg-[#170909] border border-[#2f0000] flex flex-col justify-between shadow-xl relative overflow-hidden hover:border-[#490000] transition-colors"
                   >
                     <div
                       className="absolute top-0 left-0 right-0 h-1.5"
@@ -510,10 +573,12 @@ export const ComparePage: React.FC = () => {
                     </div>
 
                     <div className="mt-6 pt-3 border-t border-[#2f0000] text-[11px] text-[#64748b] font-mono flex items-center justify-between">
-                      <span>{d.signals.summary.dataQualityNote}</span>
+                      <span className="truncate max-w-[170px]" title={d.signals.summary.dataQualityNote}>
+                        {d.signals.summary.dataQualityNote}
+                      </span>
                       <button
                         onClick={() => navigate(`/profile/${d.developer.username}`)}
-                        className="text-[#fb7185] hover:underline"
+                        className="text-[#fb7185] hover:underline cursor-pointer"
                       >
                         Profile →
                       </button>
@@ -524,7 +589,7 @@ export const ComparePage: React.FC = () => {
             </div>
 
             {/* Transparent Signal Score Formulas Banner */}
-            <div className="p-4 sm:p-5 rounded-2xl bg-[#170909] border border-[#2f0000] flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="p-4 sm:p-5 rounded-2xl bg-[#170909] border border-[#2f0000] flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-md">
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-[#e11d48] block mb-0.5">
                   Signature Feature · Explainable Signal Formulas
@@ -555,7 +620,7 @@ export const ComparePage: React.FC = () => {
 
             {/* Radar Chart Section */}
             <div className="p-6 sm:p-8 rounded-3xl bg-[#170909] border border-[#2f0000] shadow-xl">
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                 <div>
                   <h2 className="text-lg font-bold text-white">Signal Score Radar</h2>
                   <p className="text-xs text-[#94a3b8]">
@@ -563,7 +628,7 @@ export const ComparePage: React.FC = () => {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-4 text-xs font-mono">
+                <div className="flex items-center gap-4 text-xs font-mono flex-wrap">
                   {data.developers.map((d, idx) => (
                     <div key={d.developer.id} className="flex items-center gap-1.5">
                       <span
@@ -656,11 +721,29 @@ export const ComparePage: React.FC = () => {
         )}
       </main>
 
-      {/* Save Comparison Modal */}
+      {/* Save Comparison Modal with Keyboard Support */}
       {isSaving && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-[#170909] border border-[#2f0000] rounded-2xl p-6 shadow-2xl">
-            <h3 className="text-lg font-bold text-white mb-1">Save Comparison</h3>
+        <div
+          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setIsSaving(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setIsSaving(false);
+            if (e.key === 'Enter' && !saveLoading && saveName.trim()) handleSaveComparison();
+          }}
+        >
+          <div
+            className="w-full max-w-md bg-[#170909] border border-[#2f0000] rounded-2xl p-6 shadow-2xl relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-lg font-bold text-white">Save Comparison</h3>
+              <button
+                onClick={() => setIsSaving(false)}
+                className="text-[#64748b] hover:text-white p-1 rounded cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
             <p className="text-xs text-[#94a3b8] mb-4">
               Save this head-to-head comparison to reopen it anytime from your dashboard.
             </p>
@@ -677,6 +760,7 @@ export const ComparePage: React.FC = () => {
                 </label>
                 <input
                   type="text"
+                  autoFocus
                   value={saveName}
                   onChange={(e) => setSaveName(e.target.value)}
                   maxLength={60}
@@ -706,6 +790,9 @@ export const ComparePage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Signal Scores Explanation Modal */}
+      <SignalInfoModal isOpen={showSignalInfo} onClose={() => setShowSignalInfo(false)} />
     </div>
   );
 };

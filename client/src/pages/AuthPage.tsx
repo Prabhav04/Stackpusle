@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, ShieldCheck, ArrowRight, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
+import { Activity, ShieldCheck, ArrowRight, Eye, EyeOff, CheckCircle2, Lock, Mail } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.js';
+import { useToast } from '../context/ToastContext.js';
 
 export const AuthPage: React.FC = () => {
   const [isRegister, setIsRegister] = useState(false);
@@ -13,6 +14,7 @@ export const AuthPage: React.FC = () => {
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
 
   const { login, register } = useAuth();
+  const toast = useToast();
   const navigate = useNavigate();
 
   const validate = (): boolean => {
@@ -37,18 +39,25 @@ export const AuthPage: React.FC = () => {
     e.preventDefault();
     setServerError(null);
 
-    if (!validate()) return;
+    if (!validate()) {
+      toast.warning('Please resolve form validation issues before submitting');
+      return;
+    }
 
     setLoading(true);
     try {
       if (isRegister) {
         await register(email, password);
+        toast.success('Account created successfully! Welcome to StackPulse.');
       } else {
         await login(email, password);
+        toast.success('Welcome back to StackPulse!');
       }
       navigate('/dashboard');
     } catch (err: any) {
-      setServerError(err.message || 'Authentication failed. Please check your details.');
+      const msg = err.message || 'Authentication failed. Please check your credentials.';
+      setServerError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -60,10 +69,10 @@ export const AuthPage: React.FC = () => {
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#650000]/20 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#e11d48]/10 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Main Split-Card Modal (Inspired by Wise reference) */}
+      {/* Main Split-Card Modal (Wise/Linear inspired telemetry aesthetic) */}
       <div className="w-full max-w-4xl bg-[#170909] border border-[#2f0000] rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row z-10">
         
-        {/* Left Column: Bold Showcase Banner */}
+        {/* Left Column: Showcase Banner */}
         <div className="md:w-5/12 bg-gradient-to-br from-[#240a0a] via-[#1c0808] to-[#120505] p-8 md:p-10 flex flex-col justify-between border-b md:border-b-0 md:border-r border-[#2f0000] relative">
           
           {/* Top Pill Graphic */}
@@ -140,7 +149,7 @@ export const AuthPage: React.FC = () => {
 
           {/* Server Error Message */}
           {serverError && (
-            <div className="mt-4 p-3.5 rounded-xl bg-[#490000]/40 border border-[#650000] text-sm text-[#fecdd3] flex items-center gap-2">
+            <div className="mt-4 p-3.5 rounded-xl bg-[#490000]/40 border border-[#650000] text-sm text-[#fecdd3] flex items-center gap-2 animate-in fade-in">
               <span className="w-2 h-2 rounded-full bg-[#e11d48] shrink-0" />
               <span>{serverError}</span>
             </div>
@@ -153,31 +162,42 @@ export const AuthPage: React.FC = () => {
               <label className="block text-xs font-semibold text-[#cbd5e1] mb-1.5 uppercase tracking-wider">
                 Email address
               </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  if (fieldErrors.email) setFieldErrors({ ...fieldErrors, email: undefined });
-                }}
-                placeholder="developer@example.com"
-                className={`w-full px-4 py-3 rounded-xl bg-[#0f0606] border text-white placeholder-[#64748b] text-sm focus:outline-none transition-all ${
-                  fieldErrors.email
-                    ? 'border-red-500 focus:ring-2 focus:ring-red-500/30'
-                    : 'border-[#2f0000] focus:border-[#e11d48] focus:ring-2 focus:ring-[#e11d48]/20'
-                }`}
-              />
+              <div className="relative">
+                <Mail className="w-4 h-4 text-[#64748b] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (fieldErrors.email) setFieldErrors({ ...fieldErrors, email: undefined });
+                  }}
+                  placeholder="developer@example.com"
+                  className={`w-full pl-10 pr-4 py-3 rounded-xl bg-[#0f0606] border text-white placeholder-[#64748b] text-sm focus:outline-none transition-all ${
+                    fieldErrors.email
+                      ? 'border-red-500 focus:ring-2 focus:ring-red-500/30'
+                      : 'border-[#2f0000] focus:border-[#e11d48] focus:ring-2 focus:ring-[#e11d48]/20'
+                  }`}
+                />
+              </div>
               {fieldErrors.email && (
-                <p className="mt-1 text-xs text-red-400 font-medium">{fieldErrors.email}</p>
+                <p className="mt-1.5 text-xs text-red-400 font-medium">{fieldErrors.email}</p>
               )}
             </div>
 
             {/* Password Input */}
             <div>
-              <label className="block text-xs font-semibold text-[#cbd5e1] mb-1.5 uppercase tracking-wider">
-                Password
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold text-[#cbd5e1] uppercase tracking-wider">
+                  Password
+                </label>
+                {isRegister && (
+                  <span className={`text-[11px] font-mono ${password.length >= 8 ? 'text-emerald-400' : 'text-[#64748b]'}`}>
+                    {password.length >= 8 ? '✓ Min length met' : 'Min 8 characters'}
+                  </span>
+                )}
+              </div>
               <div className="relative">
+                <Lock className="w-4 h-4 text-[#64748b] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
@@ -185,8 +205,8 @@ export const AuthPage: React.FC = () => {
                     setPassword(e.target.value);
                     if (fieldErrors.password) setFieldErrors({ ...fieldErrors, password: undefined });
                   }}
-                  placeholder="At least 6 characters"
-                  className={`w-full px-4 py-3 pr-11 rounded-xl bg-[#0f0606] border text-white placeholder-[#64748b] text-sm focus:outline-none transition-all ${
+                  placeholder="At least 8 characters"
+                  className={`w-full pl-10 pr-11 py-3 rounded-xl bg-[#0f0606] border text-white placeholder-[#64748b] text-sm focus:outline-none transition-all ${
                     fieldErrors.password
                       ? 'border-red-500 focus:ring-2 focus:ring-red-500/30'
                       : 'border-[#2f0000] focus:border-[#e11d48] focus:ring-2 focus:ring-[#e11d48]/20'
@@ -195,13 +215,14 @@ export const AuthPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#64748b] hover:text-[#94a3b8] transition-colors p-1"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#64748b] hover:text-[#94a3b8] transition-colors p-1 cursor-pointer"
+                  title={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
               {fieldErrors.password && (
-                <p className="mt-1 text-xs text-red-400 font-medium">{fieldErrors.password}</p>
+                <p className="mt-1.5 text-xs text-red-400 font-medium">{fieldErrors.password}</p>
               )}
             </div>
 
