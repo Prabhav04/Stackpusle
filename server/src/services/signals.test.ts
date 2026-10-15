@@ -10,10 +10,22 @@ import {
 
 describe('Signal Scores Calculations', () => {
   describe('Reach: min(100, 25 * log10(followers + 1))', () => {
-    it('returns 0 for 0 followers', () => {
+    it('returns score: null and unavailable for 0 followers', () => {
       const res = calculateReach(0);
-      expect(res.score).toBe(0);
-      expect(res.raw).toBe(0);
+      expect(res.score).toBeNull();
+      expect(res.raw).toBe('unavailable');
+      expect(res.isAvailable).toBe(false);
+      expect(res.qualityLabel).toContain('unavailable');
+    });
+
+    it('returns unavailable for negative or invalid followers', () => {
+      const resNeg = calculateReach(-5);
+      expect(resNeg.score).toBeNull();
+      expect(resNeg.isAvailable).toBe(false);
+
+      const resNaN = calculateReach(NaN);
+      expect(resNaN.score).toBeNull();
+      expect(resNaN.isAvailable).toBe(false);
     });
 
     it('returns ~25 for 9 followers', () => {
@@ -61,7 +73,7 @@ describe('Signal Scores Calculations', () => {
 
     it('includes quality label when public repos exceed analyzed sample', () => {
       const res = calculateImpact(500, 100, 240);
-      expect(res.qualityLabel).toContain('Based on first 100 of 240 public repos');
+      expect(res.qualityLabel).toContain('100 most recently active of 240 public repos');
     });
   });
 
@@ -296,8 +308,18 @@ describe('Signal Scores Calculations', () => {
       expect(result.summary.totalStars).toBe(0);
       expect(result.summary.activeReposCount).toBe(0);
       expect(result.summary.distinctLanguagesCount).toBe(0);
+      expect(result.reach.isAvailable).toBe(false);
+      expect(result.reach.raw).toBe('unavailable');
+      expect(result.reach.score).toBeNull();
+      expect(result.impact.isAvailable).toBe(false);
+      expect(result.impact.raw).toBe('unavailable');
+      expect(result.impact.score).toBeNull();
       expect(result.activity.isAvailable).toBe(false);
       expect(result.activity.raw).toBe('unavailable');
+      expect(result.activity.score).toBeNull();
+      expect(result.breadth.isAvailable).toBe(false);
+      expect(result.breadth.raw).toBe('unavailable');
+      expect(result.breadth.score).toBeNull();
       expect(result.summary.dataQualityNote).toBe('No public repositories found to analyze');
     });
   });

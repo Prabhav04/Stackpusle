@@ -41,9 +41,21 @@ const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
 /**
  * Calculates Reach Signal Score (0-100)
  * Formula: min(100, 25 * log10(followers + 1))
+ * Edge case: 0 followers or invalid returns unavailable
  */
 export function calculateReach(followers: number): SignalScoreDetail {
-  const safeFollowers = Math.max(0, followers || 0);
+  if (followers === null || followers === undefined || isNaN(followers) || followers <= 0) {
+    return {
+      score: null,
+      isAvailable: false,
+      raw: 'unavailable',
+      formula: 'min(100, 25 × log10(followers + 1))',
+      description: 'Audience size indicator (10,000 followers = 100)',
+      qualityLabel: 'No public followers recorded — reach indicator is unavailable',
+    };
+  }
+
+  const safeFollowers = Math.max(0, followers);
   const score = Math.min(100, Math.round(25 * Math.log10(safeFollowers + 1)));
 
   return {
@@ -81,7 +93,7 @@ export function calculateImpact(
 
   const qualityLabel =
     totalPublicRepos > analyzedReposCount
-      ? `Based on first ${analyzedReposCount} of ${totalPublicRepos} public repos (excluding forks)`
+      ? `Based on ${analyzedReposCount} most recently active of ${totalPublicRepos} public repos (excluding forks)`
       : `Based on ${analyzedReposCount} owned repos (excluding forks)`;
 
   return {
@@ -200,8 +212,8 @@ export function calculateDeveloperSignals(
     totalAnalyzed === 0
       ? 'No public repositories found to analyze'
       : publicRepos > totalAnalyzed
-      ? `Metrics based on sample of ${totalAnalyzed} of ${publicRepos} public repos`
-      : `Complete sample of ${totalAnalyzed} repos analyzed`;
+      ? `Metrics based on sample of ${totalAnalyzed} most recently active of ${publicRepos} public repos (excluding forks)`
+      : `Complete sample of ${totalAnalyzed} repos analyzed (excluding forks)`;
 
   return {
     reach: calculateReach(followers),
