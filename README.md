@@ -15,7 +15,6 @@
 - **Frontend App:** [http://localhost:5173](http://localhost:5173)
 - **Backend API:** [http://localhost:5000](http://localhost:5000)
 - **Walkthrough Video:** [docs/assets/demo_walkthrough.mp4](docs/assets/demo_walkthrough.mp4) *(Full HD Walkthrough Video)*
-- **Live Demo / Loom:** [YouTube / Loom Walkthrough Link](https://youtu.be/your-demo-link) *(Follows PRD §13 demo script)*
 
 ---
 
